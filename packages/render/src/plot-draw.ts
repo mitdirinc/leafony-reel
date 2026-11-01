@@ -512,8 +512,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     const top = ring(z, n, round)
     const bot = ring(0, n, round)
     if (top.length < n || bot.length < n) continue
-    const lit = part.led !== undefined && part.led.at >= 0 && p >= part.led.at
-    ctx.strokeStyle = part.hero === true || lit ? red : pen2
+    ctx.strokeStyle = part.hero === true ? red : pen2
     const edge = (part.hero === true ? 2.4 : 1.2) * u
     ctx.lineWidth = (part.hero === true ? 1.1 : 0.5) * u
     // hidden-line boxes: opaque paper, a fine pen for the creases; the far faces go down first so every near face closes the box

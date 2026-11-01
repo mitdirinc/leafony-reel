@@ -315,10 +315,10 @@ export function drawMaps(maps: MapSet, tl: TraceTimeline, p: number, region: Reg
     fx.restore()
   }
   fx.globalCompositeOperation = 'lighter'
-  // power-on peaks on the hero: its pins burn past the bloom threshold for a beat, then settle to an ember for the poster;
+  // power-on peaks on the hero: its pins burn past the bloom threshold for two beats, then settle to an ember for the poster;
   // grown past the pad so a leadless package's pins still show beside its body
   const since = (p - wake) * 24
-  const flare = since < 0 ? 0 : Math.min(1, since / 0.3) * (0.05 + 0.95 * Math.exp(-Math.max(0, since - 1) / 1.0))
+  const flare = since < 0 ? 0 : Math.min(1, since / 0.3) * (0.05 + 0.95 * Math.exp(-Math.max(0, since - 2) / 1.0))
   if (flare > 0.01) {
     fx.fillStyle = ink(2, flare)
     for (const pad of s.pads) {

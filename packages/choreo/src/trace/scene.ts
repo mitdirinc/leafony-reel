@@ -6,7 +6,7 @@ import type {
   PartBodies, PartMesh, TracePad, TracePart, TraceScene, TraceText, TraceVia, TraceZone, TimelineWarning
 } from '../types'
 import { makeRng } from '../rng'
-import { centreOn, fitZoom } from './camera'
+import { centreOn, fitZoom, makeCam, project } from './camera'
 import { growthSchedule } from './graph'
 import type { GraphLink, GraphSeg, GraphSeed } from './graph'
 import { DEMO_MASKS } from '../hints'
@@ -543,7 +543,7 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
         heroSize: heroPart === undefined ? 0.08 * minWH : Math.max(heroPart.w, heroPart.h) * fit.scale,
         loops: loopsPx,
         tallest: Math.max(0, ...parts.map((pt) => pt.z)),
-        bodies: parts.filter((pt) => pt.hero !== true && pt.kind !== 'pin').map((pt) => [pt.x, pt.y, pt.z, Math.max(pt.w, pt.h)])
+        bodies: parts.filter((pt) => pt.hero !== true && pt.kind !== 'pin').map((pt) => [pt.x, pt.y, pt.z, Math.max(pt.w, pt.h), Math.min(pt.w, pt.h)])
       }),
       acts,
       parts,
@@ -783,7 +783,8 @@ interface ShotInput {
   /** the tallest part, px */
   tallest: number
   /** every other body as x, y, height, long side px */
-  bodies: Array<[number, number, number, number]>
+  /** x, y, height, long side, short side */
+  bodies: Array<[number, number, number, number, number]>
 }
 
 /**
@@ -848,22 +849,30 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
   const wrap = (r: number): number => Math.atan2(Math.sin(r), Math.cos(r))
   const openYaw = tilted.yaw + Math.max(-50 * D, Math.min(50 * D, wrap((away ? Math.atan2(si.hero.x - mid.x, si.hero.y - mid.y) : -24 * D) - tilted.yaw)))
   const drawn = { x: (mid.x + si.hero.x) / 2, y: (mid.y + si.hero.y) / 2, tilt: 46 * D, yaw: openYaw + 0.6 * (tilted.yaw - openYaw), aperture: 0.16 }
-  // the bench and power shots look at the hero from the side where no body stands above the line of sight to it:
-  // a body blocks by how far its top rises over the ray from the hero's near edge to the lens at that tilt
-  const blocked = (yaw: number, tilt: number): number => si.bodies.reduce((sum, [bx, by, bz, bl]) => {
-    const dx = bx - si.hero.x
-    const dy = by - si.hero.y
-    const along = dx * Math.sin(yaw) + dy * Math.cos(yaw)
-    const side = Math.abs(dx * Math.cos(yaw) - dy * Math.sin(yaw))
-    if (along <= 0 || side > (bl + si.heroSize) / 2) return sum
-    const sight = Math.max(0, along - bl / 2 - si.heroSize / 2) / Math.tan(tilt)
-    return sum + Math.max(0, bz - sight) * bl
-  }, 0)
+  // the bench and power shots look at the hero from the side where nothing nearer the lens covers it on screen:
+  // each body's box is projected through the shot's own camera and its overlap with the hero counts against the heading
+  const lens = Math.min(4, Math.max(1.4, macro * 0.55))
+  const blocked = (yaw: number, tilt: number, zoom = lens): number => {
+    const cam = makeCam({ ...si.hero, yaw, tilt, zoom, aperture: 0 }, W, H)
+    const box = (x: number, y: number, r: number, z: number): { x0: number; y0: number; x1: number; y1: number; w: number } => {
+      const qs = [-1, 1].flatMap((sx) => [-1, 1].flatMap((sy) => [0, z].map((zz) => project(cam, x + sx * r, y + sy * r, zz))))
+      return { x0: Math.min(...qs.map((q) => q.x)), y0: Math.min(...qs.map((q) => q.y)), x1: Math.max(...qs.map((q) => q.x)), y1: Math.max(...qs.map((q) => q.y)), w: Math.min(...qs.map((q) => q.w)) }
+    }
+    const hero = box(si.hero.x, si.hero.y, si.heroSize / 2, 0)
+    const depth = project(cam, si.hero.x, si.hero.y, 0).w
+    return si.bodies.reduce((sum, [bx, by, bz, bl, bs]) => {
+      const b = box(bx, by, (bl + bs) / 4, bz)
+      if (b.w >= depth) return sum
+      const ox = Math.min(b.x1, hero.x1) - Math.max(b.x0, hero.x0)
+      const oy = Math.min(b.y1, hero.y1) - Math.max(b.y0, hero.y0)
+      return ox > 0 && oy > 0 ? sum + ox * oy : sum
+    }, 0) / Math.max(1e-6, (hero.x1 - hero.x0) * (hero.y1 - hero.y0))
+  }
   const benchYaw = Array.from({ length: 24 }, (_, i) => (i * 15 - 165) * D)
-    .map((y) => ({ y, cost: blocked(y - 11 * D, 60 * D) + blocked(y + 11 * D, 54 * D) + Math.abs(wrap(y + 19 * D)) * 40 + (Math.abs(wrap(y)) > 80 * D ? 1e6 : 0) }))
+    .map((y) => ({ y, cost: blocked(y - 11 * D, 60 * D) + blocked(y + 11 * D, 54 * D, lens * 1.2) + Math.abs(wrap(y + 19 * D)) * 0.02 + (Math.abs(wrap(y)) > 80 * D ? 1e6 : 0) }))
     .sort((a, b) => a.cost - b.cost)[0]?.y ?? -19 * D
   const powerYaw = Array.from({ length: 17 }, (_, i) => (i * 10 - 80) * D)
-    .map((y) => ({ y, cost: blocked(y, 20 * D) + Math.abs(wrap(y - openYaw)) * 40 + (Math.abs(wrap(y)) > 80 * D ? 1e6 : 0) }))
+    .map((y) => ({ y, cost: blocked(y, 20 * D, lens * 1.3) + Math.abs(wrap(y - openYaw)) * 0.02 + (Math.abs(wrap(y)) > 80 * D ? 1e6 : 0) }))
     .sort((a, b) => a.cost - b.cost)[0]?.y ?? openYaw
   const bench0 = { ...si.hero, tilt: 60 * D, yaw: benchYaw - 11 * D, aperture: 0.4 }
   const bench1 = { ...si.hero, tilt: 54 * D, yaw: benchYaw + 11 * D, aperture: 0.4 }
@@ -882,8 +891,10 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
   }
   const posterA = onHero(framed(poster, 1.12, allPts), 0.15)
   const posterB = onHero(framed({ ...poster, yaw: poster.yaw * 0.85 }, 1.12, allPts), 0.15, 1.05)
-  const benchZoom = Math.min(4, Math.max(1.4, macro * 0.55))
+  const benchZoom = lens
   // while the mask spreads the camera keeps closing on the hero instead of backing away from the board
+  const drawnWhole = framed(drawn, 1.08, corners(0), 1.06)
+  const drawnIn = { ...drawnWhole, x: drawnWhole.x + (si.hero.x - drawnWhole.x) * 0.3, y: drawnWhole.y + (si.hero.y - drawnWhole.y) * 0.3, zoom: drawnWhole.zoom * 1.3 }
   const whole = framed(tilted, 1.12, corners(0))
   const leanIn = { ...whole, x: whole.x + (si.hero.x - whole.x) * 0.4, y: whole.y + (si.hero.y - whole.y) * 0.4, zoom: whole.zoom * 1.35 }
   // power-on frames the hero's half of the board; a long board is a thin strip, so closer still
@@ -892,7 +903,7 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
   const aliveZoom = fit(wide, 1.02) * (long ? 1.6 : 1.4)
   return [
     { t: 0, ...si.hero, zoom: macro, tilt: 56 * D, yaw: openYaw, aperture: 0.45 },
-    { t: a.draw[1], ...framed(drawn, 1.08, corners(0), 1.06) },
+    { t: a.draw[1], ...drawnIn },
     { t: a.place[0] - 0.001, ...leanIn },
     { t: a.place[0], ...bench0, zoom: benchZoom, cut: true },
     { t: a.reflow[1] - 0.001, ...bench1, zoom: benchZoom * 1.2 },
