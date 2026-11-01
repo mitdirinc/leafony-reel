@@ -157,7 +157,7 @@ void main(){
   col = mix(col, mix(baseCu, basePad, uFinishOn), pad);
   // the mask clears every pad by a lip and follows the copper relief beneath.
   // the coat creeps out from the hero with a ragged front, never a clean circle
-  float py = length(vec2(vW.x, -vW.y) - uOrigin) + (vnoise(mm * 0.4) - 0.5) * uMaskSoft * 2.5;
+  float py = length(vec2(vW.x, -vW.y) - uOrigin) + (vnoise(mm * 0.15) - 0.5) * uMaskSoft * 1.5;
   float padNear = textureLod(tTop, vUv, 1.4).g;
   float clearance = smoothstep(0.04, 0.22, padNear);
   float poured = smoothstep(uMaskFront, uMaskFront - uMaskSoft * 0.45, py);
