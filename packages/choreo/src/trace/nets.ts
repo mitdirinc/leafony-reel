@@ -25,7 +25,7 @@ const AUTO = /^(Net-\(|unconnected-|net\d+$)/i
 export function netKind(name: string): NetKind {
   const n = bareName(name)
   if (/^(A|D|P)?GND|^VSS|^0V$|GND$/i.test(n)) return 'ground'
-  if (/^\+|^V(CC|DD|BUS|IN|BAT|USB|AA|PLL|REF)|^\d+V\d*$|^\d+V\d*[A-Z]?$|^PWR/i.test(n)) return 'power'
+  if (/^\+|^V(CC|DD|BUS|IN|BAT|USB|AA|PLL|REF)|VBUS|^\d+V\d*$|^\d+V\d*[A-Z]?$|^PWR/i.test(n)) return 'power'
   if (/CLK|XTAL|OSC|SCK$|^SCK|MCLK|BCLK/i.test(n)) return 'clock'
   return 'signal'
 }

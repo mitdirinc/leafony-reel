@@ -103,7 +103,7 @@ function streak(
  * streaks, a lone signal is a dim one.
  */
 const ROLE_LOOK: Record<TraceGroup['kind'], { cool: boolean; grow: number; pulse: number; tail: number; steady: number }> = {
-  power: { cool: false, grow: 0.95, pulse: 0, tail: 0.05, steady: 0.22 },
+  power: { cool: false, grow: 1.2, pulse: 0, tail: 0.06, steady: 0.4 },
   ground: { cool: false, grow: 0, pulse: 0, tail: 0.01, steady: 0 },
   clock: { cool: true, grow: 0.9, pulse: 0.75, tail: 0.006, steady: 0 },
   bus: { cool: true, grow: 0.7, pulse: 0.42, tail: 0.02, steady: 0 },
@@ -113,8 +113,6 @@ const ROLE_LOOK: Record<TraceGroup['kind'], { cool: boolean; grow: number; pulse
 
 /** the hero wakes this long after power-on, once the rails have reached it */
 const WAKE = 1 / 24
-/** how long the hero's light takes to run out across the board */
-const INRUSH = 1.75 / 24
 
 /** the routing tip: white-hot at the head, cooling to bare copper along a tail of about a beat */
 const HEAD = { gain: 0.5, tail: 0.045 }
@@ -171,24 +169,7 @@ function drawCopperLayer(
     ctx.stroke(path)
   }
 
-  const [p0] = scene.acts.power
-  if (p < p0) return
-  // once the rails reach the hero it wakes, and its light runs out along every trace in the order it was routed
-  const [d0, d1] = scene.acts.draw
-  const w0 = p0 + WAKE
-  const wave = INRUSH / (d1 - d0)
-  if (p >= w0 && p < w0 + INRUSH + 0.06) {
-    // a dense cluster takes the brightest streak, not their sum, so it never merges into one blob
-    warm.ctx.globalCompositeOperation = 'lighten'
-    for (let i = 0; i < n; i++) {
-      const o = i * 7
-      const a0 = w0 + ((segs[o + 5] as number) - d0) * wave
-      if (a0 > p) break
-      streak(warm, segs[o] as number, segs[o + 1] as number, segs[o + 2] as number, segs[o + 3] as number, segs[o + 4] as number,
-        a0, w0 + ((segs[o + 6] as number) - d0) * wave, p, 0.55, 0.035)
-    }
-    warm.ctx.globalCompositeOperation = 'lighter'
-  }
+  if (p < scene.acts.power[0]) return
   for (let i = 0; i < n; i++) {
     const e0 = energy[i * 2] as number
     if (e0 < 0 || e0 > p) continue
@@ -297,6 +278,23 @@ export function drawMaps(maps: MapSet, tl: TraceTimeline, p: number, region: Reg
       top.fill()
     }
     top.restore()
+  }
+  // the hero wakes as the rails reach it: light leaks out from under its body, then settles to a glow
+  const wake = s.acts.power[0] + WAKE
+  if (p >= wake) {
+    const k = 0.22 + 0.5 * Math.max(0, 1 - (p - wake) / 0.04)
+    for (const part of s.parts) {
+      if (part.hero !== true) continue
+      top.save()
+      top.translate(part.x, part.y)
+      top.rotate(part.rot)
+      const rim = 0.06 * Math.min(part.w, part.h)
+      for (const [grow, a] of [[1, 0.3], [0.5, 0.6], [0.15, 1]] as const) {
+        top.fillStyle = ink(2, k * a)
+        top.fillRect(-part.w / 2 - rim * grow, -part.h / 2 - rim * grow, part.w + 2 * rim * grow, part.h + 2 * rim * grow)
+      }
+      top.restore()
+    }
   }
   // vias: a copper ring once the routing reaches them
   top.strokeStyle = ink(0)

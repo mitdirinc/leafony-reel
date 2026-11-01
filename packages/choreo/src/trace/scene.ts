@@ -618,18 +618,24 @@ function scheduleEnergy(
   return { groups, segTime }
 }
 
-/** the power pads of the connector that feeds the board: the J/P/USB part with the most pads on power nets */
+/**
+ * The power pads of the connector that feeds the board: one on a VBUS or VIN
+ * net when there is one, else the J/P part with the most pads on power nets.
+ */
 function powerEntry(board: BoardModel, isPower: (net: number | undefined) => boolean): GraphSeed[] {
+  const supply = new Set(board.nets.filter((n) => /VBUS|VUSB|^\/?VIN$/i.test(n.name)).map((n) => n.id))
+  const feeds = new Set<string>()
   const byRef = new Map<string, GraphSeed[]>()
   for (const [layer, copper] of Object.entries(board.copper)) {
     for (const pad of copper.pads) {
       if (pad.footprintRef === undefined || !/^(J|P|CN|USB|X)\d/i.test(pad.footprintRef) || !isPower(pad.netId)) continue
+      if (pad.netId !== undefined && supply.has(pad.netId)) feeds.add(pad.footprintRef)
       const list = byRef.get(pad.footprintRef) ?? []
       list.push({ layer, pos: pad.pos })
       byRef.set(pad.footprintRef, list)
     }
   }
-  return [...byRef.values()].sort((a, b) => b.length - a.length)[0] ?? []
+  return [...byRef.entries()].sort((a, b) => Number(feeds.has(b[0])) - Number(feeds.has(a[0])) || b[1].length - a[1].length)[0]?.[1] ?? []
 }
 
 /**
@@ -826,10 +832,11 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
   const wide = { ...mid, tilt: 38 * D, yaw: heroYaw, aperture: 0.05, shift }
   const poster = { ...mid, tilt: 52 * D, yaw: -heroYaw * 0.7, aperture: 0.08, shift }
   // the poster holds everything on the board, a connector hanging off its edge included
-  const allPts: Array<[number, number, number]> = [...boardPts, ...si.bodies.flatMap(([bx, by, bz, bl]): Array<[number, number, number]> =>
+  const off = si.bodies.filter(([bx, by]) => bx < x0 || bx > x1 || by < y0 || by > y1)
+  const allPts: Array<[number, number, number]> = [...corners(0), ...off.flatMap(([bx, by, bz, bl]): Array<[number, number, number]> =>
     [[bx - bl / 2, by - bl / 2, bz], [bx + bl / 2, by - bl / 2, bz], [bx - bl / 2, by + bl / 2, bz], [bx + bl / 2, by + bl / 2, bz]])]
-  const posterA = framed(poster, 1.06, allPts)
-  const posterB = framed({ ...poster, yaw: poster.yaw * 0.85 }, 1.06, allPts, 1.06)
+  const posterA = framed(poster, 1.12, allPts)
+  const posterB = framed({ ...poster, yaw: poster.yaw * 0.85 }, 1.12, allPts, 1.05)
   const benchZoom = Math.min(4, Math.max(1.4, macro * 0.55))
   // power-on frames the hero's half of the board; a long board is a thin strip, so closer still
   const long = Math.max(bAspect, 1 / bAspect) > 2.2

@@ -253,7 +253,7 @@ void main(){
   for (float i = 0.0; i < 6.0; i += 1.0) {
     if (i >= uLayers) break;
     float li = uLayers > 1.0 ? i / (uLayers - 1.0) : 0.0;
-    band = max(band, exp(-sq((vF - li) / 0.03)));
+    band = max(band, 0.45 * exp(-sq((vF - li) / 0.02)));
   }
   float fibre = 0.5 + 0.5 * sin(vF * 70.0);
   vec3 lam = shade(N, V, uSub * (1.2 + 0.4 * fibre), 0.0, 0.7, 0.04);
@@ -401,7 +401,7 @@ void main(){
   } else if (kind == 5) {     // LED: milky lens that lights at power-on, from its centre, so neighbours keep a dark gap
     float lens = top * (1.0 - smoothstep(0.3, 0.44, max(abs(vL.x), abs(vL.y))));
     alb = mix(vec3(0.3, 0.3, 0.28), vLed.rgb, 0.25) * (1.0 - 0.6 * uLedOn * lens); rough = 0.2;
-    emit = vLed.rgb * uLedOn * 3.2 * vLed.a * (lens + 0.1 * (1.0 - top));
+    emit = vLed.rgb * uLedOn * 2.3 * vLed.a * (lens + 0.1 * (1.0 - top));
   } else if (kind == 6) {     // crystal: a metal can
     alb = vec3(0.72, 0.73, 0.75); metal = 1.0; rough = 0.3;
   } else if (kind == 7) {     // connector: black plastic, a grid of gold pins on top
@@ -499,7 +499,7 @@ void main(){
     float m = marking(vQ) * top;
     alb = mix(alb, vec3(0.16, 0.16, 0.165), m); rough = mix(rough, 0.75, m);
   } else if (kind == 5) {
-    emit = vLed.rgb * uLedOn * 3.2 * vLed.a * smoothstep(0.4, 1.0, vL.z) * (1.0 - metal);
+    emit = vLed.rgb * uLedOn * 2.3 * vLed.a * smoothstep(0.4, 1.0, vL.z) * (1.0 - metal);
   }
   vec3 col = shade(N, V, alb, metal, rough, 0.045);
   col *= mix(0.45, 1.0, smoothstep(0.0, 0.35, vL.z));
@@ -1024,16 +1024,16 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
       const energyGain = 3.2
       // the studio dims for the held breath before power-on, so the board's own light carries the
       // climax; a dark mask has little to lose, so it dims less and comes back further for the poster
-      // lights down for the held breath, so the board's own light carries power-on; the studio is
-      // back up before the poster cut, so the film ends on one steady light
+      // lights down for the held breath, so the board's own light carries power-on; the studio comes
+      // most of the way back before the poster cut, leaving room for the lit rails to read in the hold
       const out = 0.45 + 0.3 * Math.pow(maskLuma, 1 / 2.2)
-      const room = 1 - out * span([acts.reflow[1], acts.power[0]]) + out * 0.85 * span([18.5 / 24, 20 / 24])
+      const room = 1 - out * span([acts.reflow[1], acts.power[0]]) + out * 0.6 * span([18.5 / 24, 20 / 24])
       const heatSpan = (acts.reflow[1] - acts.reflow[0]) - 0.5 / 24
       const heatU = (p - acts.reflow[0]) / heatSpan
       const heat = Math.min(span([acts.reflow[0] - 0.01, acts.reflow[0] + 0.01]), 1 - span([acts.reflow[1] - 0.01, acts.reflow[1] + 0.01]))
       const centre = { x: extent.x + extent.w / 2, y: extent.y + extent.h / 2 }
       const diag = Math.hypot(extent.w, extent.h)
-      const floorZ = -Math.max(1.5, m.thicknessPx * 1.4) - 0.5
+      const floorZ = -Math.max(1.5, m.thicknessPx) - 0.5
       const keyAz = -2.35 + p * 1.1
 
       const drawScene = (c: Cam, q: number): void => {
@@ -1066,7 +1066,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
           const loc = g.getAttribLocation(P.wall.p, 'aWall')
           g.enableVertexAttribArray(loc)
           g.vertexAttribPointer(loc, 4, g.FLOAT, false, 0, 0)
-          P.wall.use().m4('uVP', c.vp).f('uThick', Math.max(1.5, m.thicknessPx * 1.4)).f('uZ', 0)
+          P.wall.use().m4('uVP', c.vp).f('uThick', Math.max(1.5, m.thicknessPx)).f('uZ', 0)
             .v3('uSub', linear(m.substrate)).v3('uCopper', copper).v3('uMask', maskLin).f('uLayers', Math.max(1, s.layers.length)).f('uMaskOn', maskSpan)
           lighting(P.wall, c, p, room)
           g.drawArrays(g.TRIANGLES, 0, wallCount)

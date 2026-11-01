@@ -47,8 +47,9 @@ export function drawAnnotations(ctx: CanvasRenderingContext2D, anns: Annotation[
       const fits = (d: number): boolean => x + d * (rise + rule) > W * 0.06 && x + d * (rise + rule) < W * 0.94
       const away = x < W / 2 ? -1 : 1
       const dir = fits(away) ? away : -away
-      const ex = x + dir * rise
-      const ey = ay - rise
+      // the whole label stays inside the safe area, however the part moves
+      const ex = Math.min(W * 0.94 - (dir > 0 ? rule : 0), Math.max(W * 0.06 + (dir < 0 ? rule : 0), x + dir * rise))
+      const ey = Math.max(H * 0.08 + 40 * u, ay - rise)
       const rx = ex + dir * rule
       const k = a.alpha
       ctx.lineWidth = 1.6 * u
