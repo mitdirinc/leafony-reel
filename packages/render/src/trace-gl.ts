@@ -106,7 +106,7 @@ vec3 shade(vec3 N, vec3 V, vec3 albedo, float metal, float rough0, float f0d){
   vec3 diff = albedo * (1.0 - metal) * (NoL * uKeyCol + uFill) / PI * 2.0;
   vec3 refl = envLight(reflect(-V, N), rough) * mix(Fr, albedo * 0.9 + 0.1, metal);
   // a dimmed studio goes cool, so the board's warm light has a colour to stand against
-  vec3 lit = (diff + spec + refl) * uRoom * mix(vec3(0.62, 0.8, 1.2), vec3(1.0), smoothstep(0.15, 0.85, uRoom)) + rim;
+  vec3 lit = (diff + spec + refl) * uRoom * mix(vec3(0.8, 0.9, 1.08), vec3(1.0), smoothstep(0.35, 0.9, uRoom)) + rim;
   // stop below the bloom threshold, keeping the hue
   return lit * min(1.0, LIT_MAX / max(1e-4, max(lit.r, max(lit.g, lit.b))));
 }`
@@ -189,7 +189,11 @@ void main(){
   float cap = mix(0.5, 1.25, masked * smoothstep(0.4, 0.8, uMaskLuma));
   float warm = min(mix(a.b, textureLod(tTop, vUv, lod).b * spread, scatter), cap);
   float cool = min(mix(fx.r, textureLod(tFx, vUv, lod).r * spread, scatter), cap + 0.2);
-  col += uWarm * pow(warm, 1.4) * uEnergy + uCool * pow(cool, 1.4) * uEnergy * 1.15;
+  // under a pale coat light glows through as a deeper amber, not a white glare on white
+  float pale = masked * smoothstep(0.5, 0.9, uMaskLuma);
+  vec3 warmCol = mix(uWarm, vec3(1.0, 0.42, 0.1), pale * 0.75);
+  vec3 coolCol = mix(uCool, vec3(1.0, 0.6, 0.25), pale * 0.6);
+  col += (warmCol * pow(warm, 1.4) + coolCol * pow(cool, 1.4) * 1.15) * uEnergy * mix(1.0, 0.85, pale);
   // fresh copper cools like a struck wire: white at the head, then amber, then a dull red into bare metal
   vec3 hot = mix(vec3(0.85, 0.16, 0.03), vec3(1.0, 0.55, 0.18), smoothstep(0.04, 0.3, head));
   hot = mix(hot, uHead, smoothstep(0.32, 0.55, head));
@@ -1020,11 +1024,10 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
       const energyGain = 3.2
       // the studio dims for the held breath before power-on, so the board's own light carries the
       // climax; a dark mask has little to lose, so it dims less and comes back further for the poster
-      // lights down for the held breath, so the board's own light carries power-on; the studio
-      // comes back up on the poster cut
-      const out = 0.86
-      const room = 1 - out * span([acts.reflow[1], acts.power[0]]) + 0.06 * span([acts.power[0], 20 / 24])
-        + (out - 0.06) * 0.85 * span([20 / 24, 21.5 / 24])
+      // lights down for the held breath, so the board's own light carries power-on; the studio is
+      // back up before the poster cut, so the film ends on one steady light
+      const out = 0.45 + 0.3 * Math.pow(maskLuma, 1 / 2.2)
+      const room = 1 - out * span([acts.reflow[1], acts.power[0]]) + out * 0.85 * span([18.5 / 24, 20 / 24])
       const heatSpan = (acts.reflow[1] - acts.reflow[0]) - 0.5 / 24
       const heatU = (p - acts.reflow[0]) / heatSpan
       const heat = Math.min(span([acts.reflow[0] - 0.01, acts.reflow[0] + 0.01]), 1 - span([acts.reflow[1] - 0.01, acts.reflow[1] + 0.01]))
@@ -1101,7 +1104,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
           tex(0, atlasTex)
           P.part.use().m4('uVP', c.vp).f('uP', q).f('uDur', tl.durationSeconds).f('uFall', 6 * m.pxPerMm)
             .i('tAtlas', 0).f('uCell', 1 / ATLAS_COLS, 1 / ATLAS_ROWS).v3('uFinish', linear(m.finish))
-            .f('uLedOn', span([acts.power[0], acts.power[0] + 0.01])).f('uHeat', span([acts.power[0], acts.power[0] + 3 / 24]))
+            .f('uLedOn', span([acts.power[0] + 2 / 24, acts.power[0] + 2 / 24 + 0.01])).f('uHeat', span([acts.power[0], acts.power[0] + 3 / 24]))
           lighting(P.part, c, p, room)
           if (boxCount > 0) {
             point(0)
@@ -1120,7 +1123,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
           if (meshDraws.length > 0) {
             P.mesh.use().m4('uVP', c.vp).f('uP', q).f('uDur', tl.durationSeconds).f('uFall', 6 * m.pxPerMm)
               .i('tAtlas', 0).f('uCell', 1 / ATLAS_COLS, 1 / ATLAS_ROWS)
-              .f('uLedOn', span([acts.power[0], acts.power[0] + 0.01]))
+              .f('uLedOn', span([acts.power[0] + 2 / 24, acts.power[0] + 2 / 24 + 0.01]))
             lighting(P.mesh, c, p, room)
             const vertex = ([['aPos', 3, g.FLOAT, false], ['aNor', 3, g.BYTE, true], ['aCol', 3, g.UNSIGNED_BYTE, true]] as const).map(([n, size, type, normalized]) => ({ loc: g.getAttribLocation(P.mesh.p, n), size, type, normalized }))
             const perPart = ['aAff', 'aBox', 'aMeta', 'aLabel', 'aSkew', 'aLed'].map((n) => g.getAttribLocation(P.mesh.p, n))

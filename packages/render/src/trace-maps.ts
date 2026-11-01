@@ -103,7 +103,7 @@ function streak(
  * streaks, a lone signal is a dim one.
  */
 const ROLE_LOOK: Record<TraceGroup['kind'], { cool: boolean; grow: number; pulse: number; tail: number; steady: number }> = {
-  power: { cool: false, grow: 0.7, pulse: 0, tail: 0.03, steady: 0.18 },
+  power: { cool: false, grow: 0.95, pulse: 0, tail: 0.05, steady: 0.22 },
   ground: { cool: false, grow: 0, pulse: 0, tail: 0.01, steady: 0 },
   clock: { cool: true, grow: 0.9, pulse: 0.75, tail: 0.006, steady: 0 },
   bus: { cool: true, grow: 0.7, pulse: 0.42, tail: 0.02, steady: 0 },
@@ -111,8 +111,10 @@ const ROLE_LOOK: Record<TraceGroup['kind'], { cool: boolean; grow: number; pulse
   signal: { cool: true, grow: 0.4, pulse: 0.3, tail: 0.012, steady: 0 }
 }
 
-/** how long the power-on wave takes to cross the board, in film phase */
-const INRUSH = 1.6 / 24
+/** the hero wakes this long after power-on, once the rails have reached it */
+const WAKE = 1 / 24
+/** how long the hero's light takes to run out across the board */
+const INRUSH = 1.75 / 24
 
 /** the routing tip: white-hot at the head, cooling to bare copper along a tail of about a beat */
 const HEAD = { gain: 0.5, tail: 0.045 }
@@ -171,18 +173,19 @@ function drawCopperLayer(
 
   const [p0] = scene.acts.power
   if (p < p0) return
-  // power-on: one warm wave crosses every trace in the order it was routed
+  // once the rails reach the hero it wakes, and its light runs out along every trace in the order it was routed
   const [d0, d1] = scene.acts.draw
+  const w0 = p0 + WAKE
   const wave = INRUSH / (d1 - d0)
-  if (p < p0 + INRUSH + 0.06) {
+  if (p >= w0 && p < w0 + INRUSH + 0.06) {
     // a dense cluster takes the brightest streak, not their sum, so it never merges into one blob
     warm.ctx.globalCompositeOperation = 'lighten'
     for (let i = 0; i < n; i++) {
       const o = i * 7
-      const w0 = p0 + ((segs[o + 5] as number) - d0) * wave
-      if (w0 > p) break
+      const a0 = w0 + ((segs[o + 5] as number) - d0) * wave
+      if (a0 > p) break
       streak(warm, segs[o] as number, segs[o + 1] as number, segs[o + 2] as number, segs[o + 3] as number, segs[o + 4] as number,
-        w0, p0 + ((segs[o + 6] as number) - d0) * wave, p, 0.5, 0.03)
+        a0, w0 + ((segs[o + 6] as number) - d0) * wave, p, 0.55, 0.035)
     }
     warm.ctx.globalCompositeOperation = 'lighter'
   }
@@ -241,10 +244,7 @@ function drawZones(ctx: CanvasRenderingContext2D, warm: Light, scene: TraceScene
     ctx.fillStyle = ink(0, 0.55)
     ctx.fill()
     ctx.restore()
-    // the power-on wave crosses each pour as a soft ring; a power pour keeps a low glow
-    const [p0] = scene.acts.power
-    const u = (p - p0) / INRUSH
-    if (u > 0 && u < 1.2) frontRing(warm, clip, scene.origin, u * reachMax * 0.8, 0.04 * Math.min(1, (1.2 - u) * 4))
+    // a power pour keeps a low glow once its rail is live
     if (zone.e0 >= 0 && p > zone.e0) {
       warm.ctx.save()
       warm.ctx.clip(clip)
@@ -253,22 +253,6 @@ function drawZones(ctx: CanvasRenderingContext2D, warm: Light, scene: TraceScene
       warm.ctx.restore()
     }
   }
-}
-
-/** a soft band of light just inside a front of radius r */
-function frontRing(l: Light, clip: Path2D, o: { x: number; y: number }, r: number, a: number): void {
-  const band = Math.max(60, r * 0.25)
-  l.ctx.save()
-  l.ctx.clip(clip)
-  const grad = l.ctx.createRadialGradient(o.x, o.y, Math.max(0, r - band), o.x, o.y, r)
-  grad.addColorStop(0, ink(l.ch, 0))
-  grad.addColorStop(0.8, ink(l.ch, a))
-  grad.addColorStop(1, ink(l.ch, 0))
-  l.ctx.fillStyle = grad
-  l.ctx.beginPath()
-  l.ctx.arc(o.x, o.y, r, 0, Math.PI * 2)
-  l.ctx.fill()
-  l.ctx.restore()
 }
 
 /** how high a part still hangs above its seat: 1 before it drops, 0 once set down */

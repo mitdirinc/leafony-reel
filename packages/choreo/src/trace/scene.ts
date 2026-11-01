@@ -27,7 +27,7 @@ const B = 1 / 24
  */
 export const TRACE_ACTS: TraceActs = {
   draw: [0, 5.5 * B],
-  pour: [5 * B, 6.5 * B],
+  pour: [7.5 * B, 8.5 * B],
   mask: [6.5 * B, 8.5 * B],
   silk: [9 * B, 10.5 * B],
   place: [10 * B, 13.5 * B],
@@ -189,7 +189,12 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
 
   const { groups: netGroups, groupOf } = groupNets(board.nets)
   const segGroup = segNet.map((n) => (n === undefined ? -1 : (groupOf.get(n) ?? -1)))
-  const sched = scheduleEnergy(netGroups.map((ng) => ng.kind), segLen, segNet, segGroup, g.start, md, seed)
+  // power-on enters where power really enters: current runs the rails out of the board's power connector
+  const isPower = (net: number | undefined): boolean => net !== undefined && netGroups[groupOf.get(net) ?? -1]?.kind === 'power'
+  const entry = powerEntry(board, isPower)
+  const gIn = entry.length > 0 ? growthSchedule(segs, links, entry, entry[0]?.pos ?? originMm) : g
+  const eStart = segGroup.map((gi, i) => (netGroups[gi]?.kind === 'power' ? gIn.start[i] : g.start[i]) as number)
+  const sched = scheduleEnergy(netGroups.map((ng) => ng.kind), segLen, segNet, segGroup, eStart, md, seed)
 
   // the routing: a wavefront out of the hero's pins, in even work per beat
   const [d0, d1] = acts.draw
@@ -483,8 +488,9 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
   const callouts: TraceCallout[] = []
   const heroBody = parts.find((pt) => pt.hero === true)
   if (hero !== undefined && heroBody !== undefined) {
-    const value = board.footprints.find((f) => f.ref === hero.ref)?.value
-    callouts.push({ t0: heroBody.t + 0.5 * B, t1: rf1 - 0.002, x: origin.x, y: origin.y, text: hero.ref, sub: partNumber(value) })
+    // the part number leads; the ref alone would only repeat what the silkscreen already says
+    const number = partNumber(board.footprints.find((f) => f.ref === hero.ref)?.value)
+    if (number !== undefined) callouts.push({ t0: heroBody.t + 0.5 * B, t1: rf1 - 0.002, x: origin.x, y: origin.y, text: number, sub: hero.ref })
   }
 
   const minWH = Math.min(resolved.width, resolved.height)
@@ -610,6 +616,20 @@ function scheduleEnergy(
     return [grp.t + a * grp.d, grp.t + Math.min(1, b) * grp.d]
   })
   return { groups, segTime }
+}
+
+/** the power pads of the connector that feeds the board: the J/P/USB part with the most pads on power nets */
+function powerEntry(board: BoardModel, isPower: (net: number | undefined) => boolean): GraphSeed[] {
+  const byRef = new Map<string, GraphSeed[]>()
+  for (const [layer, copper] of Object.entries(board.copper)) {
+    for (const pad of copper.pads) {
+      if (pad.footprintRef === undefined || !/^(J|P|CN|USB|X)\d/i.test(pad.footprintRef) || !isPower(pad.netId)) continue
+      const list = byRef.get(pad.footprintRef) ?? []
+      list.push({ layer, pos: pad.pos })
+      byRef.set(pad.footprintRef, list)
+    }
+  }
+  return [...byRef.values()].sort((a, b) => b.length - a.length)[0] ?? []
 }
 
 /**
@@ -805,15 +825,18 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
   const bench1 = { ...si.hero, tilt: 54 * D, yaw: benchYaw + 11 * D, aperture: 0.4 }
   const wide = { ...mid, tilt: 38 * D, yaw: heroYaw, aperture: 0.05, shift }
   const poster = { ...mid, tilt: 52 * D, yaw: -heroYaw * 0.7, aperture: 0.08, shift }
-  const posterA = framed(poster, 1.06)
-  const posterB = framed({ ...poster, yaw: poster.yaw * 0.85 }, 1.06, boardPts, 1.06)
+  // the poster holds everything on the board, a connector hanging off its edge included
+  const allPts: Array<[number, number, number]> = [...boardPts, ...si.bodies.flatMap(([bx, by, bz, bl]): Array<[number, number, number]> =>
+    [[bx - bl / 2, by - bl / 2, bz], [bx + bl / 2, by - bl / 2, bz], [bx - bl / 2, by + bl / 2, bz], [bx + bl / 2, by + bl / 2, bz]])]
+  const posterA = framed(poster, 1.06, allPts)
+  const posterB = framed({ ...poster, yaw: poster.yaw * 0.85 }, 1.06, allPts, 1.06)
   const benchZoom = Math.min(4, Math.max(1.4, macro * 0.55))
   // power-on frames the hero's half of the board; a long board is a thin strip, so closer still
   const long = Math.max(bAspect, 1 / bAspect) > 2.2
   const alive = { ...wide, x: (mid.x + si.hero.x) / 2, y: (mid.y + si.hero.y) / 2 }
   const aliveZoom = fit(wide, 1.02) * (long ? 1.6 : 1.4)
   return [
-    { t: 0, ...si.hero, zoom: macro * 0.8, tilt: 56 * D, yaw: openYaw, aperture: 0.45 },
+    { t: 0, ...si.hero, zoom: macro, tilt: 56 * D, yaw: openYaw, aperture: 0.45 },
     { t: a.draw[1], ...framed(drawn, 1.08, corners(0), 1.06) },
     { t: a.place[0] - 0.001, ...framed(tilted, 1.12, corners(0)) },
     { t: a.place[0], ...bench0, zoom: benchZoom, cut: true },
