@@ -536,7 +536,10 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     ctx.lineWidth = edge
     ctx.beginPath()
     const sil = hull([...top, ...bot])
-    sil.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)))
+    for (const [i, [x, y]] of sil.entries()) {
+      if (i === 0) ctx.moveTo(x, y)
+      else ctx.lineTo(x, y)
+    }
     ctx.closePath()
     ctx.stroke()
     if (part.kind === 'ic' && !round) {
