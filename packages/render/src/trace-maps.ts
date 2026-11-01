@@ -102,7 +102,7 @@ function streak(
  * lit; the hero's own lines carry one cool streak out of it and settle to an ember.
  */
 const ROLE_LOOK: Record<TraceGroup['kind'], { cool: boolean; grow: number; tail: number; steady: number }> = {
-  power: { cool: false, grow: 1.2, tail: 0.06, steady: 0.4 },
+  power: { cool: false, grow: 1.2, tail: 0.06, steady: 0.2 },
   ground: { cool: false, grow: 0, tail: 0.01, steady: 0 },
   clock: { cool: true, grow: 0.9, tail: 0.03, steady: 0.12 },
   bus: { cool: true, grow: 0.8, tail: 0.03, steady: 0.12 },
@@ -273,7 +273,7 @@ export function drawMaps(maps: MapSet, tl: TraceTimeline, p: number, region: Reg
   // the hero wakes as the rails reach it: its own pins light, flaring once, then hold a warm glow
   const wake = s.acts.power[0] + WAKE
   if (p >= wake) {
-    const k = 0.55 + 0.45 * Math.max(0, 1 - (p - wake) / 0.04)
+    const k = 0.4 + 0.6 * Math.max(0, 1 - (p - wake) / 0.04)
     for (const part of s.parts) {
       if (part.hero !== true) continue
       const c = Math.cos(-part.rot)

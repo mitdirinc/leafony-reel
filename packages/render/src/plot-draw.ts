@@ -170,9 +170,12 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     }
   }
   ctx.lineWidth = 2.2 * u
-  for (const path of s.outline) {
-    if (outlineFrac >= 1) polyPath(ctx, v, path)
-    else partialPath(ctx, v, path, outlineFrac)
+  // one pen travels the edge piece after piece, never every piece at once
+  for (const [i, path] of s.outline.entries()) {
+    const frac = clamp01(outlineFrac * s.outline.length - i)
+    if (frac <= 0) break
+    if (frac >= 1) polyPath(ctx, v, path)
+    else partialPath(ctx, v, path, frac)
     ctx.stroke()
     drawn += 1
   }
@@ -340,8 +343,8 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
       for (let j = 0; j * 7 + 6 < layer.segs.length; j++) {
         const e0 = layer.energy[j * 2] as number
         const e1 = layer.energy[j * 2 + 1] as number
-        if (e0 < 0 || p < e0) continue
-        // the live lines keep their red through the hold: one route from the rails into the hero and out of it
+        if (e0 < 0 || p < e0 || s.groups[layer.groups[j] as number]?.kind === 'power') continue
+        // only the hero's own lines take the red pen, and keep it through the hold
         const k = clamp01((p - e0) / Math.max(1e-6, e1 - e0))
         const o = j * 7
         const ax = layer.segs[o] as number
@@ -461,7 +464,9 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
           ctx.fill()
         }
       }
-      const sc = localAffine(ctx, v, mx + d.off[0] * 0.35, my + d.off[1] * 0.35)
+      const label = toScreen(v, mx + d.off[0] * 0.35, my + d.off[1] * 0.35)
+      const inside = label !== undefined && label[0] > 0.1 * W && label[0] < 0.9 * W && label[1] > 0.06 * H && label[1] < 0.94 * H
+      const sc = inside ? localAffine(ctx, v, mx + d.off[0] * 0.35, my + d.off[1] * 0.35) : 0
       if (sc > 0) {
         ctx.translate(mx + d.off[0] * 0.35, my + d.off[1] * 0.35)
         if (d.off[0] !== 0) ctx.rotate(-Math.PI / 2)

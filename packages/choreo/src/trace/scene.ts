@@ -724,7 +724,7 @@ const LED_COLOURS: Array<[RegExp, string]> = [
   [/WHITE|WHT|WS28|SK68|APA10|RGB/, '#fff1e2']
 ]
 
-/** power indicators: LEDs to ground, fed through one resistor straight off a rail. They light the moment power arrives */
+/** power indicators: LEDs to ground whose own unnamed net is fed through one resistor straight off a rail (a named net is a signal with a pull-up). They light the moment power arrives */
 function pilotLeds(board: BoardModel, isPower: (net: number | undefined) => boolean): Set<string> {
   const nets = new Map<string, Set<number>>()
   for (const copper of Object.values(board.copper)) {
@@ -744,7 +744,8 @@ function pilotLeds(board: BoardModel, isPower: (net: number | undefined) => bool
   }
   const ground = new Set(board.nets.filter((n) => /GND|VSS/i.test(n.name)).map((n) => n.id))
   const out = new Set<string>()
-  for (const [ref, set] of nets) if (/^(LED|D)\d/.test(ref) && [...set].some((n) => ground.has(n)) && [...set].some((n) => fed.has(n))) out.add(ref)
+  const junction = new Set(board.nets.filter((n) => /^Net-\(/.test(n.name)).map((n) => n.id))
+  for (const [ref, set] of nets) if (/^(LED|D)\d/.test(ref) && [...set].some((n) => ground.has(n)) && [...set].some((n) => fed.has(n) && junction.has(n))) out.add(ref)
   return out
 }
 

@@ -1027,10 +1027,10 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
       const maskLin = linear(m.mask)
       const maskLuma = 0.2126 * maskLin[0] + 0.7152 * maskLin[1] + 0.0722 * maskLin[2]
       const energyGain = 3.2
-      // lights down for the held breath, so the board's own light carries power-on; the studio comes
-      // most of the way back before the poster cut, leaving room for the lit rails to read in the hold
-      const out = 0.4 + 0.1 * Math.pow(maskLuma, 1 / 2.2)
-      const room = 1 - out * span([acts.reflow[1], acts.power[0]]) + out * (0.6 - 0.25 * Math.pow(maskLuma, 1 / 2.2)) * span([18.5 / 24, 20 / 24])
+      // the room goes down on the power beat itself, so the board's own light carries power-on; a pale
+      // board stays darker into the poster, where the hero's light would otherwise wash out
+      const out = 0.4 + 0.25 * Math.pow(maskLuma, 1 / 2.2)
+      const room = 1 - out * span([acts.power[0] - 0.25 / 24, acts.power[0] + 0.5 / 24]) + out * (0.6 - 0.35 * Math.pow(maskLuma, 1 / 2.2)) * span([18.5 / 24, 20 / 24])
       const centre = { x: extent.x + extent.w / 2, y: extent.y + extent.h / 2 }
       const diag = Math.hypot(extent.w, extent.h)
       const floorZ = -Math.max(1.5, m.thicknessPx) - 0.5
