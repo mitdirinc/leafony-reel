@@ -861,10 +861,13 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
   const benchYaw = [-40, -30, -20, -10, 0, 10, 20, 30, 40].map((d) => d * D)
     .map((y) => ({ y, cost: blocked(y - 11 * D) + blocked(y + 11 * D) + Math.abs(y + 19 * D) * 0.001 }))
     .sort((a, b) => a.cost - b.cost)[0]?.y ?? -19 * D
+  const powerYaw = [0, -15, 15, -30, 30, -45, 45].map((d) => openYaw + d * D)
+    .map((y, i) => ({ y, cost: blocked(y) + i * 1e-3 }))
+    .sort((a, b) => a.cost - b.cost)[0]?.y ?? openYaw
   const bench0 = { ...si.hero, tilt: 60 * D, yaw: benchYaw - 11 * D, aperture: 0.4 }
   const bench1 = { ...si.hero, tilt: 54 * D, yaw: benchYaw + 11 * D, aperture: 0.4 }
   const wide = { ...mid, tilt: 38 * D, yaw: heroYaw, aperture: 0.05, shift }
-  const poster = { ...mid, tilt: 38 * D, yaw: -heroYaw * 1.4, aperture: 0.08, shift }
+  const poster = { ...mid, tilt: 38 * D, yaw: -heroYaw * 1.4, aperture: 0.08, shift: shift === undefined ? undefined : shift * 0.5 }
   // the poster holds the board and a connector overhanging its edge, but not a part standing well clear of it
   const reach = 0.08 * Math.max(x1 - x0, y1 - y0)
   const off = si.bodies.filter(([bx, by]) => (bx < x0 || bx > x1 || by < y0 || by > y1) &&
@@ -889,8 +892,8 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
     { t: a.place[0] - 0.001, ...framed(tilted, 1.12, corners(0)) },
     { t: a.place[0], ...bench0, zoom: benchZoom, cut: true },
     { t: a.reflow[1] - 0.001, ...bench1, zoom: benchZoom * 1.12 },
-    // power-on returns to the opening's heading, looking down on the hero, and pulls back as its light runs out
-    { t: a.reflow[1], ...si.hero, tilt: 28 * D, yaw: openYaw, zoom: Math.max(aliveZoom * 1.3, Math.min(macro * 0.5, benchZoom * 1.3)), aperture: 0.25, cut: true },
+    // power-on looks down on the hero from near the opening's heading, the side with no tall body in the way, and pulls back as its light runs out
+    { t: a.reflow[1], ...si.hero, tilt: 28 * D, yaw: powerYaw, zoom: Math.max(aliveZoom * 1.3, Math.min(macro * 0.5, benchZoom * 1.3)), aperture: 0.25, cut: true },
     { t: 20 / 24 - 0.001, ...alive, yaw: heroYaw * 0.75, zoom: aliveZoom * 1.04 },
     { t: 20 / 24, ...posterA, cut: true },
     { t: 1, ...posterB }

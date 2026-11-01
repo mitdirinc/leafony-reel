@@ -80,6 +80,8 @@ export interface FormationEvent {
 export interface CastHints {
   preferRefs?: string[]
   preferTexts?: string[]
+  /** the part the trace and plot films are about, when it is not the first preferred IC */
+  hero?: string
 }
 
 export type StyleId = 'trace' | 'glyph' | 'plot'

@@ -13,7 +13,7 @@ export interface HeroPick {
 
 export function pickHero(board: BoardModel, hints?: CastHints, ref?: string): HeroPick | undefined {
   if (board.footprints.length === 0) return undefined
-  const fp = heroPart(board, ref, hints)
+  const fp = heroPart(board, ref ?? hints?.hero, hints)
   if (fp === undefined) return undefined
   const hero = fp
   const pads: HeroPick['pads'] = []

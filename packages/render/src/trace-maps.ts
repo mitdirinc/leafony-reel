@@ -315,6 +315,21 @@ export function drawMaps(maps: MapSet, tl: TraceTimeline, p: number, region: Reg
     fx.restore()
   }
   fx.globalCompositeOperation = 'lighter'
+  // power-on peaks on the hero: its pins burn past the bloom threshold for a beat, then settle
+  const since = (p - wake) * 24
+  const flare = since < 0 ? 0 : Math.min(1, since / 0.3) * Math.exp(-Math.max(0, since - 1) / 1.5)
+  if (flare > 0.01) {
+    fx.fillStyle = ink(2, flare)
+    for (const pad of s.pads) {
+      if (pad.hero !== true) continue
+      fx.save()
+      fx.translate(pad.x, pad.y)
+      fx.rotate(pad.rot)
+      padPath(fx, pad.w, pad.h, pad.shape)
+      fx.fill()
+      fx.restore()
+    }
+  }
 
   // --- surface: silk, holes, board area
   const surf = begin(maps.surf, region)

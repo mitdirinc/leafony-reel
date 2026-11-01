@@ -166,8 +166,14 @@ export function resolveConfig(config: FilmConfig): ResolvedConfig {
       throw new ChoreoConfigError('cast', cast, 'expected a CastHints object')
     }
     for (const [key, list] of Object.entries(cast)) {
+      if (key === 'hero') {
+        if (typeof list !== 'string' || list.trim() === '' || list.length > 64) {
+          throw new ChoreoConfigError('cast.hero', list, 'expected a footprint reference such as U1')
+        }
+        continue
+      }
       if (key !== 'preferRefs' && key !== 'preferTexts') {
-        throw new ChoreoConfigError(`cast.${key}`, list, 'expected preferRefs or preferTexts')
+        throw new ChoreoConfigError(`cast.${key}`, list, 'expected preferRefs, preferTexts or hero')
       }
       if (!Array.isArray(list) || list.some((v) => typeof v !== 'string' || v.length === 0) || list.length > 32) {
         throw new ChoreoConfigError(`cast.${key}`, list, 'expected an array of up to 32 non-empty strings')

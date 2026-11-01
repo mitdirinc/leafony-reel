@@ -121,7 +121,7 @@ uniform vec3 uCopper; uniform vec3 uFinish; uniform vec3 uMask; uniform vec3 uSu
 uniform vec3 uWarm; uniform vec3 uCool; uniform vec3 uHead;
 uniform float uFinishRough; uniform float uMaskFront; uniform float uMaskSoft; uniform float uMaskOn; uniform float uMaskLuma;
 uniform float uCured; uniform float uFinishOn; uniform float uEnergy; uniform float uPxPerMm; uniform float uBump;
-uniform float uDark; uniform vec2 uOrigin;
+uniform float uDark; uniform vec2 uOrigin; uniform float uFlare;
 ${LIGHTING}
 float hcu(vec2 uv, float lod){ return smoothstep(0.2, 0.8, textureLod(tTop, uv, lod).r); }
 vec2 gradH(float s, float lod){
@@ -155,27 +155,22 @@ void main(){
   vec3 basePad = shade(Ncu, V, uFinish, 1.0, max(uFinishRough, 0.22), 0.04);
   vec3 col = mix(baseSub, baseCu, cu);
   col = mix(col, mix(baseCu, basePad, uFinishOn), pad);
-  // the mask coats the board in one pass: a crisp wet front, then a glossy
-  // coat that settles to satin. it clears every pad by a lip and follows the
-  // copper relief beneath
-  // the coat spreads out from the hero in one ring
-  float py = length(vec2(vW.x, -vW.y) - uOrigin);
+  // the mask clears every pad by a lip and follows the copper relief beneath.
+  // the coat creeps out from the hero with a ragged, feathered front: no rim to read as a lens
+  float py = length(vec2(vW.x, -vW.y) - uOrigin) + (vnoise(mm * 0.4) - 0.5) * uMaskSoft * 2.5;
   float padNear = textureLod(tTop, vUv, 1.4).g;
   float clearance = smoothstep(0.04, 0.22, padNear);
-  float poured = smoothstep(uMaskFront, uMaskFront - uMaskSoft * 0.3, py);
+  float poured = smoothstep(uMaskFront, uMaskFront - uMaskSoft * 1.6, py);
   float masked = uMaskOn * poured * (1.0 - max(pad, clearance)) * (1.0 - hole);
-  float wet = uMaskOn * exp(-sq((py - (uMaskFront - uMaskSoft * 0.22)) / (uMaskSoft * 0.14)));
   vec2 lip = gradC(tTop, 1, 2.0, 1.4) * uBump * 0.8 * uMaskOn;
   // under the coat the relief softens: traces read as gentle ridges, not engraved lines
-  vec3 Nm = normalize(vec3(-g.x * 0.28 + lip.x, g.y * 0.28 - lip.y + wet * 0.35, 1.0));
+  vec3 Nm = normalize(vec3(-g.x * 0.28 + lip.x, g.y * 0.28 - lip.y, 1.0));
   // a dark mask shows the copper under it as a faint lift; a white one warms a touch
   float lift = mix(1.18, 1.03, uMaskLuma);
   float sink = mix(0.9, 0.95, uMaskLuma);
   vec3 maskAlb = mix(uMask * sink, min(uMask * lift + uCopper * mix(0.018, 0.02, uMaskLuma), vec3(0.82)), cu);
-  vec3 maskC = shade(Nm, V, maskAlb, 0.0, mix(0.05, mix(0.08, 0.16, uCured), 1.0 - wet), 0.05);
+  vec3 maskC = shade(Nm, V, maskAlb, 0.0, mix(0.08, 0.16, uCured), 0.05);
   col = mix(col, maskC, masked);
-  // the wet front catches the key as a bright line, so even a black coat is seen arriving
-  col += vec3(0.16, 0.17, 0.18) * wet * (1.0 - uMaskLuma) * (1.0 - max(pad, hole));
   vec3 Ns = normalize(vec3(-gs.x, gs.y, 1.0));
   col = mix(col, shade(Ns, V, uSilk, 0.0, 0.7, 0.04), silk * (0.4 + 0.6 * poured * uMaskOn));
   float drill = hole * (1.0 - pad);
@@ -205,6 +200,7 @@ void main(){
   float before = max(col.r, max(col.g, col.b));
   col += hot * head * uEnergy * 0.6 * (1.0 - masked) * (1.0 - drill);
   col *= min(1.0, max(1.5, before) / max(1e-4, max(col.r, max(col.g, col.b))));
+  col += vec3(1.0, 0.72, 0.42) * head * uFlare * (1.0 - drill);
   float alpha = clamp(max(area * (1.0 - drill), max(max(cu, pad), max(warm, max(cool, head)) * (1.0 - drill))), 0.0, 1.0);
   o = vec4(col * alpha, alpha);
 }`
@@ -1019,7 +1015,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
       const soft = 0.035 * extent.h
       const reach = Math.max(...[[extent.x, extent.y], [extent.x + extent.w, extent.y], [extent.x, extent.y + extent.h], [extent.x + extent.w, extent.y + extent.h]]
         .map(([x, y]) => Math.hypot((x as number) - s.origin.x, (y as number) - s.origin.y)))
-      const maskFront = -soft + (1 - (1 - maskSpan) ** 2) * (reach + 2 * soft)
+      const maskFront = -3 * soft + (1 - (1 - maskSpan) ** 2) * (reach + 6 * soft)
       const maskLin = linear(m.mask)
       const maskLuma = 0.2126 * maskLin[0] + 0.7152 * maskLin[1] + 0.0722 * maskLin[2]
       const energyGain = 3.2
@@ -1080,7 +1076,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
           .v3('uSub', linear(m.substrate)).v3('uSilk', linear(m.silk)).v3('uWarm', warmC).v3('uCool', coolC).f('uHead', 1.3, 1.12, 0.92)
           .f('uFinishRough', m.finishRough).f('uMaskFront', maskFront).f('uMaskSoft', soft).f('uMaskOn', maskOn).f('uMaskLuma', Math.pow(maskLuma, 1 / 2.2))
           .f('uCured', span([acts.mask[1], acts.mask[1] + 0.04])).f('uFinishOn', span([acts.mask[1] - 0.01, acts.mask[1] + 0.02]))
-          .f('uEnergy', energyGain).f('uPxPerMm', m.pxPerMm).f('uBump', 1.6)
+          .f('uEnergy', energyGain).f('uFlare', p >= acts.power[0] ? 4 : 0).f('uPxPerMm', m.pxPerMm).f('uBump', 1.6)
           .f('uOrigin', s.origin.x, s.origin.y).f('uDark', 1 - span([acts.draw[1] - 1 / 24, acts.mask[0] + 0.5 / 24]))
         lighting(P.top, c, p, room)
         g.drawArrays(g.TRIANGLE_STRIP, 0, 4)
