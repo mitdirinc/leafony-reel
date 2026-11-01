@@ -855,8 +855,13 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
     bx > x0 - reach && bx < x1 + reach && by > y0 - reach && by < y1 + reach)
   const allPts: Array<[number, number, number]> = [...corners(0), ...off.flatMap(([bx, by, bz, bl]): Array<[number, number, number]> =>
     [[bx - bl / 2, by - bl / 2, bz], [bx + bl / 2, by - bl / 2, bz], [bx - bl / 2, by + bl / 2, bz], [bx + bl / 2, by + bl / 2, bz]])]
-  const posterA = framed(poster, 1.12, allPts)
-  const posterB = framed({ ...poster, yaw: poster.yaw * 0.85 }, 1.12, allPts, 1.05)
+  // the poster holds the whole board, leant toward the hero and refitted so every edge stays inside
+  const onHero = <S extends Omit<CameraShot, 't' | 'zoom' | 'cut'> & { zoom: number }>(shot: S, k: number, push = 1): S => {
+    const leant = { ...shot, x: shot.x + (si.hero.x - shot.x) * k, y: shot.y + (si.hero.y - shot.y) * k }
+    return { ...leant, zoom: fit(leant, 1.12, allPts) * push }
+  }
+  const posterA = onHero(framed(poster, 1.12, allPts), 0.15)
+  const posterB = onHero(framed({ ...poster, yaw: poster.yaw * 0.85 }, 1.12, allPts), 0.15, 1.05)
   const benchZoom = Math.min(4, Math.max(1.4, macro * 0.55))
   // power-on frames the hero's half of the board; a long board is a thin strip, so closer still
   const long = Math.max(bAspect, 1 / bAspect) > 2.2
@@ -868,8 +873,8 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
     { t: a.place[0] - 0.001, ...framed(tilted, 1.12, corners(0)) },
     { t: a.place[0], ...bench0, zoom: benchZoom, cut: true },
     { t: a.reflow[1] - 0.001, ...bench1, zoom: benchZoom * 1.12 },
-    // power-on returns to the opening's angle, close on the hero, and pulls back as its light runs out
-    { t: a.reflow[1], ...si.hero, tilt: 50 * D, yaw: openYaw, zoom: Math.max(aliveZoom * 1.3, Math.min(macro * 0.5, benchZoom * 1.3)), aperture: 0.25, cut: true },
+    // power-on returns to the opening's heading, looking down on the hero, and pulls back as its light runs out
+    { t: a.reflow[1], ...si.hero, tilt: 28 * D, yaw: openYaw, zoom: Math.max(aliveZoom * 1.3, Math.min(macro * 0.5, benchZoom * 1.3)), aperture: 0.25, cut: true },
     { t: 20 / 24 - 0.001, ...alive, yaw: heroYaw * 0.75, zoom: aliveZoom * 1.04 },
     { t: 20 / 24, ...posterA, cut: true },
     { t: 1, ...posterB }

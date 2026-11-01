@@ -257,8 +257,8 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
       if (!a || !b) continue
       const w = (segs[i + 4] as number) * planScale
       const live = front && (s.groups[layer.groups[i / 7] as number]?.t ?? -1) >= 0
-      if (front && w > 3.2 * u) {
-        const key = (live ? 1 : -1) * Math.round(w * 2) / 2
+      if (live && w > 3.2 * u) {
+        const key = Math.round(w * 2) / 2
         let path = wide.get(key)
         if (path === undefined) {
           path = new Path2D()
@@ -280,14 +280,14 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     ctx.strokeStyle = ink
     ctx.lineWidth = hair
     ctx.stroke(thin)
-    for (const [key, path] of wide) {
-      ctx.strokeStyle = key > 0 ? ink : faint
-      ctx.lineWidth = Math.abs(key)
+    for (const [w, path] of wide) {
+      ctx.strokeStyle = ink
+      ctx.lineWidth = w
       ctx.stroke(path)
     }
-    for (const [key, path] of wide) {
+    for (const [w, path] of wide) {
       ctx.strokeStyle = paper
-      ctx.lineWidth = Math.max(0, Math.abs(key) - 2 * hair)
+      ctx.lineWidth = Math.max(0, w - 2 * hair)
       ctx.stroke(path)
     }
   }
@@ -490,8 +490,8 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
   }
   bodies.sort((a, b) => b.d - a.d)
   for (const { part, at } of bodies) {
-    // a tall housing is capped low, so no blank block outweighs the hero
-    const z = part.hero === true ? part.z : Math.min(part.z, 2 * m.pxPerMm)
+    // a tall housing is capped low, so no blank block outweighs the hero; the hero keeps a package's proportions
+    const z = part.hero === true ? Math.min(part.z, 0.2 * Math.min(part.w, part.h)) : Math.min(part.z, 2 * m.pxPerMm)
     const cr = Math.cos(at.rot)
     const sr = Math.sin(at.rot)
     const ring = (z: number, n: number, round: boolean): Pt[] => {
