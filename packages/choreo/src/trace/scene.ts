@@ -6,7 +6,7 @@ import type {
   PartBodies, PartMesh, TracePad, TracePart, TraceScene, TraceText, TraceVia, TraceZone, TimelineWarning
 } from '../types'
 import { makeRng } from '../rng'
-import { fitZoom } from './camera'
+import { centreOn, fitZoom } from './camera'
 import { growthSchedule } from './graph'
 import type { GraphLink, GraphSeg, GraphSeed } from './graph'
 import { DEMO_MASKS } from '../hints'
@@ -28,7 +28,7 @@ const B = 1 / 24
 export const TRACE_ACTS: TraceActs = {
   draw: [0, 5.5 * B],
   pour: [5 * B, 6.5 * B],
-  mask: [6.5 * B, 9.5 * B],
+  mask: [6.5 * B, 8.5 * B],
   silk: [9 * B, 10.5 * B],
   place: [10 * B, 13.5 * B],
   reflow: [13.5 * B, 15 * B],
@@ -508,7 +508,8 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
         hero: origin,
         heroSize: heroPart === undefined ? 0.08 * minWH : Math.max(heroPart.w, heroPart.h) * fit.scale,
         loops: loopsPx,
-        tallest: Math.max(0, ...parts.map((pt) => pt.z))
+        tallest: Math.max(0, ...parts.map((pt) => pt.z)),
+        bodies: parts.filter((pt) => pt.hero !== true && pt.kind !== 'pin').map((pt) => [pt.x, pt.y, pt.z, Math.max(pt.w, pt.h)])
       }),
       acts,
       parts,
@@ -679,7 +680,8 @@ function material(board: BoardModel, resolved: ResolvedConfig, pxPerMm: number):
     substrate: trueColour ? '#2b2617' : mixHex(palette.bg, palette.copperDim, 0.3),
     silk,
     energyWarm: trueColour ? '#ffc98a' : palette.head,
-    energyCool: trueColour ? '#9fd6ff' : mixHex(palette.head, palette.silk, 0.5),
+    // one colour temperature: data runs as a paler shade of the same warm light
+    energyCool: trueColour ? '#ffe9cc' : mixHex(palette.head, palette.silk, 0.5),
     pxPerMm,
     thicknessPx: board.stackup.thickness * pxPerMm
   }
@@ -721,6 +723,8 @@ interface ShotInput {
   loops: FlatPath[]
   /** the tallest part, px */
   tallest: number
+  /** every other body as x, y, height, long side px */
+  bodies: Array<[number, number, number, number]>
 }
 
 /**
@@ -764,6 +768,15 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
   const heroYaw = (skew > 0.9 ? 30 : 18) * D * (bAspect > fAspect ? 1 : -1)
   const fit = (shot: Omit<CameraShot, 't' | 'zoom' | 'cut'>, m = 1, pts = boardPts): number =>
     fitZoom(shot, pts, W, H, 0.84 * m, (shot.shift === undefined ? 0.8 : 0.8 - shot.shift) * m)
+  /** the board centred in the picture, then fitted; two passes, since the centre moves with the zoom */
+  const framed = <S extends Omit<CameraShot, 't' | 'zoom' | 'cut'>>(shot: S, m = 1, pts = boardPts, push = 1): S & { zoom: number } => {
+    let out = { ...shot, zoom: fit(shot, m, pts) * push }
+    for (let i = 0; i < 2; i++) {
+      out = { ...out, ...centreOn(out, pts, W, H) }
+      out = { ...out, zoom: fit(out, m, pts) * push }
+    }
+    return out
+  }
   // with a title card, the held shots frame the board above its band: a lens shift, not a tilt
   const band = resolved.title === undefined ? 0 : (H - (safe.y + safe.h)) / H
   const shift = band > 0 ? band - 0.01 : undefined
@@ -775,10 +788,25 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
   const wrap = (r: number): number => Math.atan2(Math.sin(r), Math.cos(r))
   const openYaw = tilted.yaw + Math.max(-50 * D, Math.min(50 * D, wrap((away ? Math.atan2(si.hero.x - mid.x, si.hero.y - mid.y) : -24 * D) - tilted.yaw)))
   const drawn = { x: (mid.x + si.hero.x) / 2, y: (mid.y + si.hero.y) / 2, tilt: 46 * D, yaw: openYaw + 0.6 * (tilted.yaw - openYaw), aperture: 0.16 }
-  const bench0 = { ...si.hero, tilt: 60 * D, yaw: -30 * D, aperture: 0.4 }
-  const bench1 = { ...si.hero, tilt: 54 * D, yaw: -8 * D, aperture: 0.4 }
+  // the bench looks at the hero from the side with the fewest tall bodies between it and the lens,
+  // so no connector sweeps the foreground; the camera arcs 22° across that side
+  const reachPx = 2.2 * Math.max(si.heroSize, 0.08 * Math.min(W, H))
+  const blocked = (yaw: number): number => si.bodies.reduce((sum, [bx, by, bz, bl]) => {
+    const dx = bx - si.hero.x
+    const dy = by - si.hero.y
+    const along = dx * Math.sin(yaw) + dy * Math.cos(yaw)
+    const side = Math.abs(dx * Math.cos(yaw) - dy * Math.sin(yaw))
+    return along > 0 && along < reachPx * 5 && side < bl / 2 + reachPx * (0.8 + along / reachPx * 0.35) ? sum + bz * bz * bl : sum
+  }, 0)
+  const benchYaw = [-40, -30, -20, -10, 0, 10, 20, 30, 40].map((d) => d * D)
+    .map((y) => ({ y, cost: blocked(y - 11 * D) + blocked(y + 11 * D) + Math.abs(y + 19 * D) * 0.001 }))
+    .sort((a, b) => a.cost - b.cost)[0]?.y ?? -19 * D
+  const bench0 = { ...si.hero, tilt: 60 * D, yaw: benchYaw - 11 * D, aperture: 0.4 }
+  const bench1 = { ...si.hero, tilt: 54 * D, yaw: benchYaw + 11 * D, aperture: 0.4 }
   const wide = { ...mid, tilt: 38 * D, yaw: heroYaw, aperture: 0.05, shift }
   const poster = { ...mid, tilt: 52 * D, yaw: -heroYaw * 0.7, aperture: 0.08, shift }
+  const posterA = framed(poster, 1.06)
+  const posterB = framed({ ...poster, yaw: poster.yaw * 0.85 }, 1.06, boardPts, 1.06)
   const benchZoom = Math.min(4, Math.max(1.4, macro * 0.55))
   // power-on frames the hero's half of the board; a long board is a thin strip, so closer still
   const long = Math.max(bAspect, 1 / bAspect) > 2.2
@@ -786,14 +814,14 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
   const aliveZoom = fit(wide, 1.02) * (long ? 1.6 : 1.4)
   return [
     { t: 0, ...si.hero, zoom: macro * 0.8, tilt: 56 * D, yaw: openYaw, aperture: 0.45 },
-    { t: a.draw[1], ...drawn, zoom: fit(drawn, 1.04, corners(0)) * 1.2 },
-    { t: a.place[0] - 0.001, ...tilted, zoom: fit(tilted, 1.1, corners(0)) },
+    { t: a.draw[1], ...framed(drawn, 1.08, corners(0), 1.06) },
+    { t: a.place[0] - 0.001, ...framed(tilted, 1.12, corners(0)) },
     { t: a.place[0], ...bench0, zoom: benchZoom, cut: true },
     { t: a.reflow[1] - 0.001, ...bench1, zoom: benchZoom * 1.12 },
     { t: a.reflow[1], ...alive, zoom: aliveZoom, cut: true },
     { t: 20 / 24 - 0.001, ...alive, yaw: heroYaw * 0.75, zoom: aliveZoom * 1.04 },
-    { t: 20 / 24, ...poster, zoom: fit(poster, 1.08) * 1.04, cut: true },
-    { t: 1, ...poster, yaw: poster.yaw * 0.85, zoom: fit(poster, 1.08) * 1.1 }
+    { t: 20 / 24, ...posterA, cut: true },
+    { t: 1, ...posterB }
   ]
 }
 

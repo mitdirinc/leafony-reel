@@ -1,5 +1,5 @@
 // trace look-loop: stills of the lit trace renderer at chosen phases, one sheet per board
-// usage: npx tsx scripts/trace-stills.mts glasgow,icebreaker,path/to/own.kicad_pcb 4:5 0.05,0.3,0.62,0.9 [out]
+// usage: [STYLE=plot] npx tsx scripts/trace-stills.mts glasgow,icebreaker,path/to/own.kicad_pcb 4:5 0.05,0.3,0.62,0.9 [out]
 // part models: SILK_REEL_MODELS=dir1:dir2 adds STEP folders (; on Windows); SILK_REEL_MODELS=none keeps estimated bodies
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, rmSync } from 'node:fs'
@@ -24,7 +24,7 @@ try {
     const own = arg.endsWith('.kicad_pcb')
     const board = own ? path.basename(arg, '.kicad_pcb') : arg
     const size = ASPECT_SIZE[aspect as Aspect]
-    const config = { ...defaultFilmConfig(board), style: 'trace', aspect, output: { ...defaultFilmConfig(board).output, ...size } } as unknown as FilmConfig
+    const config = { ...defaultFilmConfig(board), style: process.env.STYLE ?? 'trace', aspect, output: { ...defaultFilmConfig(board).output, ...size } } as unknown as FilmConfig
     const model = own ? parseKicadPcb(readFileSync(arg, 'utf8'), path.basename(arg)) : await loadDemoBoard(board)
     const dirs = process.env.SILK_REEL_MODELS?.split(path.delimiter) ?? []
     const bodies = dirs[0] === 'none' ? undefined : (await loadPartBodies(model, { boardDir: own ? path.dirname(path.resolve(arg)) : path.join(root, 'fixtures/boards'), dirs })).bodies

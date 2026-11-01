@@ -1,4 +1,4 @@
-import { makeCam, norm, sampleShot } from '@silk-reel/choreo'
+import { makeCam, norm, project, sampleShot } from '@silk-reel/choreo'
 import type { Cam, CameraShot, TracePart, TraceTimeline } from '@silk-reel/choreo'
 import { createMaps, drawMaps } from './trace-maps'
 import type { MapSet, Region } from './trace-maps'
@@ -20,6 +20,8 @@ export interface Annotation {
   text: string
   sub?: string | undefined
   alpha: number
+  /** the part it names, in screen px */
+  anchor?: { x: number; y: number } | undefined
 }
 
 export interface TraceGL {
@@ -103,7 +105,8 @@ vec3 shade(vec3 N, vec3 V, vec3 albedo, float metal, float rough0, float f0d){
   vec3 rim = ggx(N, V, Lr, max(rough, 0.18)) * Fr * uRimCol * smoothstep(0.02, 0.35, 1.0 - N.z);
   vec3 diff = albedo * (1.0 - metal) * (NoL * uKeyCol + uFill) / PI * 2.0;
   vec3 refl = envLight(reflect(-V, N), rough) * mix(Fr, albedo * 0.9 + 0.1, metal);
-  vec3 lit = (diff + spec + refl) * uRoom + rim;
+  // a dimmed studio goes cool, so the board's warm light has a colour to stand against
+  vec3 lit = (diff + spec + refl) * uRoom * mix(vec3(0.62, 0.8, 1.2), vec3(1.0), smoothstep(0.15, 0.85, uRoom)) + rim;
   // stop below the bloom threshold, keeping the hue
   return lit * min(1.0, LIT_MAX / max(1e-4, max(lit.r, max(lit.g, lit.b))));
 }`
@@ -116,7 +119,7 @@ uniform vec3 uCopper; uniform vec3 uFinish; uniform vec3 uMask; uniform vec3 uSu
 uniform vec3 uWarm; uniform vec3 uCool; uniform vec3 uHead;
 uniform float uFinishRough; uniform float uMaskFront; uniform float uMaskSoft; uniform float uMaskOn; uniform float uMaskLuma;
 uniform float uCured; uniform float uFinishOn; uniform float uEnergy; uniform float uPxPerMm; uniform float uBump;
-uniform float uHeat; uniform float uHeatX; uniform float uHeatW; uniform float uDark; uniform vec2 uOrigin;
+uniform float uHeat; uniform float uHeatX; uniform float uHeatW; uniform float uDark; uniform vec2 uOrigin; uniform vec2 uMaskDir;
 ${LIGHTING}
 float hcu(vec2 uv, float lod){ return smoothstep(0.2, 0.8, textureLod(tTop, uv, lod).r); }
 vec2 gradH(float s, float lod){
@@ -150,13 +153,11 @@ void main(){
   vec3 basePad = shade(Ncu, V, uFinish, 1.0, max(uFinishRough, 0.22), 0.04);
   vec3 col = mix(baseSub, baseCu, cu);
   col = mix(col, mix(baseCu, basePad, uFinishOn), pad);
-  // the mask coats the board out from the hero: a wet front, then a glossy
+  // the mask coats the board in one pass: a crisp wet front, then a glossy
   // coat that settles to satin. it clears every pad by a lip and follows the
   // copper relief beneath
-  // the coat spreads out of the hero like the routing did, a lobed liquid front
-  vec2 off = vec2(vW.x, -vW.y) - uOrigin;
-  float lobes = sin(atan(off.y, off.x) * 5.0 + length(off) * 0.004) * 0.5 + 0.5;
-  float py = length(off) + (vnoise(mm * 0.35) - 0.5) * uMaskSoft * 0.7 + lobes * uMaskSoft * 0.25;
+  // one straight squeegee pass across the board, leaving the hero's side first
+  float py = dot(vec2(vW.x, -vW.y) - uOrigin, uMaskDir);
   float padNear = textureLod(tTop, vUv, 1.4).g;
   float clearance = smoothstep(0.04, 0.22, padNear);
   float poured = smoothstep(uMaskFront, uMaskFront - uMaskSoft * 0.3, py);
@@ -181,18 +182,21 @@ void main(){
   // light: the only thing brighter than a lit surface. under the coat it spreads a little
   // a pale mask scatters what is under it far more than a dark one
   float scatter = masked * mix(0.6, 0.95, uMaskLuma);
-  float lod = mix(1.6, 2.8, uMaskLuma);
-  float spread = mix(1.4, 2.0, uMaskLuma);
+  float lod = mix(1.4, 1.9, uMaskLuma);
+  float spread = mix(1.3, 1.5, uMaskLuma);
   // capped, so a crowd of pads stays a set of lines instead of swelling into a halo;
   // only a pale coat, which really does glow from within, lifts the cap
-  float cap = mix(0.5, 1.6, masked * smoothstep(0.4, 0.8, uMaskLuma));
+  float cap = mix(0.5, 1.25, masked * smoothstep(0.4, 0.8, uMaskLuma));
   float warm = min(mix(a.b, textureLod(tTop, vUv, lod).b * spread, scatter), cap);
   float cool = min(mix(fx.r, textureLod(tFx, vUv, lod).r * spread, scatter), cap + 0.2);
   col += uWarm * pow(warm, 1.4) * uEnergy + uCool * pow(cool, 1.4) * uEnergy * 1.15;
   // fresh copper cools like a struck wire: white at the head, then amber, then a dull red into bare metal
   vec3 hot = mix(vec3(0.85, 0.16, 0.03), vec3(1.0, 0.55, 0.18), smoothstep(0.04, 0.3, head));
   hot = mix(hot, uHead, smoothstep(0.32, 0.55, head));
-  col += hot * head * uEnergy * (1.0 - masked);
+  // held under the bloom threshold: the drawing glows, but power-on is the film's only light event
+  float before = max(col.r, max(col.g, col.b));
+  col += hot * head * uEnergy * 0.6 * (1.0 - masked);
+  col *= min(1.0, max(1.5, before) / max(1e-4, max(col.r, max(col.g, col.b))));
   float alpha = clamp(max(area * (1.0 - hole * (1.0 - pad)), max(max(cu, pad), max(warm, max(cool, head)))), 0.0, 1.0);
   o = vec4(col * alpha, alpha);
 }`
@@ -1001,18 +1005,24 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
       const regionV = [region.x, region.y, region.w, region.h] as const
       const maskSpan = span(acts.mask)
       const maskOn = p >= acts.mask[0] ? 1 : 0
-      const soft = 0.07 * extent.h
-      const reach = Math.max(...[[extent.x, extent.y], [extent.x + extent.w, extent.y], [extent.x, extent.y + extent.h], [extent.x + extent.w, extent.y + extent.h]]
-        .map(([x, y]) => Math.hypot((x as number) - s.origin.x, (y as number) - s.origin.y)))
-      const maskFront = -soft + maskSpan * (reach + 2 * soft)
+      const soft = 0.035 * extent.h
+      const centre0 = { x: extent.x + extent.w / 2, y: extent.y + extent.h / 2 }
+      const toward = Math.hypot(centre0.x - s.origin.x, centre0.y - s.origin.y) > 0.05 * extent.h
+        ? Math.atan2(centre0.y - s.origin.y, centre0.x - s.origin.x)
+        : Math.PI / 2
+      const maskDir = [Math.cos(toward), Math.sin(toward)] as const
+      const along = [[extent.x, extent.y], [extent.x + extent.w, extent.y], [extent.x, extent.y + extent.h], [extent.x + extent.w, extent.y + extent.h]]
+        .map(([x, y]) => ((x as number) - s.origin.x) * maskDir[0] + ((y as number) - s.origin.y) * maskDir[1])
+      const lo = Math.min(...along)
+      const maskFront = lo - soft + maskSpan * (Math.max(...along) - lo + 2 * soft)
       const maskLin = linear(m.mask)
       const maskLuma = 0.2126 * maskLin[0] + 0.7152 * maskLin[1] + 0.0722 * maskLin[2]
       const energyGain = 3.2
       // the studio dims for the held breath before power-on, so the board's own light carries the
       // climax; a dark mask has little to lose, so it dims less and comes back further for the poster
-      // lights out for the held breath: the board's own light carries power-on. the studio comes back
-      // up on the poster cut, less for a dark mask, which reads better lit by its own energy
-      const out = 0.9 - 0.12 * (1 - Math.pow(maskLuma, 1 / 2.2))
+      // lights down for the held breath, so the board's own light carries power-on; the studio
+      // comes back up on the poster cut
+      const out = 0.86
       const room = 1 - out * span([acts.reflow[1], acts.power[0]]) + 0.06 * span([acts.power[0], 20 / 24])
         + (out - 0.06) * 0.85 * span([20 / 24, 21.5 / 24])
       const heatSpan = (acts.reflow[1] - acts.reflow[0]) - 0.5 / 24
@@ -1072,7 +1082,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
           .f('uCured', span([acts.mask[1], acts.mask[1] + 0.04])).f('uFinishOn', span([acts.mask[1] - 0.01, acts.mask[1] + 0.02]))
           .f('uEnergy', energyGain).f('uPxPerMm', m.pxPerMm).f('uBump', 1.6)
           .f('uHeat', heat).f('uHeatX', boardX[0] + heatU * (boardX[1] - boardX[0])).f('uHeatW', 0.12 * extent.w)
-          .f('uOrigin', s.origin.x, s.origin.y).f('uDark', 1 - span([acts.draw[1] - 1 / 24, acts.mask[0] + 0.5 / 24]))
+          .f('uOrigin', s.origin.x, s.origin.y).f('uMaskDir', ...maskDir).f('uDark', 1 - span([acts.draw[1] - 1 / 24, acts.mask[0] + 0.5 / 24]))
         lighting(P.top, c, p, room)
         g.drawArrays(g.TRIANGLE_STRIP, 0, 4)
         if (boxCount + roundCount + valveCount + meshDraws.length > 0) {
@@ -1246,7 +1256,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
       quad()
       g.finish()
 
-      lastAnnotations = annotate(tl, p)
+      lastAnnotations = annotate(tl, p, cam, W, H)
       return canvas
     },
     dispose(): void {
@@ -1255,11 +1265,19 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
   }
 }
 
-/** the captions showing at phase p, faded in and out */
-function annotate(tl: TraceTimeline, p: number): Annotation[] {
+/** the captions showing at phase p, faded in and out, pinned to the top of the part they name */
+function annotate(tl: TraceTimeline, p: number, cam: Cam, W: number, H: number): Annotation[] {
+  const top = Math.max(0, ...tl.scene.parts.filter((pt) => pt.hero === true).map((pt) => pt.z))
   return tl.scene.callouts
     .filter((c) => p >= c.t0 && p <= c.t1)
-    .map((c) => ({ text: c.text, sub: c.sub, alpha: Math.min(ease((p - c.t0) / 0.012), ease((c.t1 - p) / 0.012)) }))
+    .map((c) => {
+      const q = project(cam, c.x, c.y, top)
+      return {
+        text: c.text,
+        sub: c.sub,
+        alpha: Math.min(ease((p - c.t0) / 0.035), ease((c.t1 - p) / 0.012)),
+        anchor: q.w > 0 ? { x: (q.x * 0.5 + 0.5) * W, y: (0.5 - q.y * 0.5) * H } : undefined
+      }
+    })
     .filter((a) => a.alpha > 0.01)
 }
-

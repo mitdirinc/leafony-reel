@@ -28,22 +28,61 @@ const QUALITY: Record<RenderQuality, TraceQuality> = {
 /** a caption set in the frame's top-left safe corner, shadowed so it reads on a white board or a black one */
 export function drawAnnotations(ctx: CanvasRenderingContext2D, anns: Annotation[], W: number, H: number): void {
   const u = Math.min(W, H) / 1080
-  const x = W * 0.075
   let y = H * 0.085
   for (const a of anns) {
     ctx.save()
-    ctx.globalAlpha = a.alpha
     ctx.shadowColor = 'rgba(0,0,0,0.55)'
     ctx.shadowBlur = 18 * u
     ctx.fillStyle = 'rgba(244,244,240,0.97)'
-    ctx.textAlign = 'left'
+    ctx.strokeStyle = 'rgba(244,244,240,0.9)'
     ctx.textBaseline = 'alphabetic'
+    if (a.anchor !== undefined) {
+      // a leader out of the part, up and away from the frame's centre, then a rule the name sits on
+      const { x, y: ay } = a.anchor
+      ctx.font = `600 ${Math.round(40 * u)}px ${FONT}`
+      const named = ctx.measureText(a.text).width
+      ctx.font = `${Math.round(22 * u)}px ${FONT}`
+      const rule = Math.max(named, a.sub === undefined ? 0 : ctx.measureText(a.sub).width) + 16 * u
+      const rise = Math.min(0.2 * H, Math.max(0.08 * H, ay - 0.16 * H))
+      const fits = (d: number): boolean => x + d * (rise + rule) > W * 0.06 && x + d * (rise + rule) < W * 0.94
+      const away = x < W / 2 ? -1 : 1
+      const dir = fits(away) ? away : -away
+      const ex = x + dir * rise
+      const ey = ay - rise
+      const rx = ex + dir * rule
+      const k = a.alpha
+      ctx.lineWidth = 1.6 * u
+      ctx.globalAlpha = Math.min(1, k * 2)
+      ctx.beginPath()
+      ctx.arc(x, ay, 7 * u, 0, Math.PI * 2)
+      ctx.stroke()
+      const d1 = Math.min(1, k * 1.6)
+      ctx.beginPath()
+      ctx.moveTo(x + (ex - x) * (7 * u / Math.hypot(ex - x, ey - ay)), ay + (ey - ay) * (7 * u / Math.hypot(ex - x, ey - ay)))
+      ctx.lineTo(x + (ex - x) * d1, ay + (ey - ay) * d1)
+      if (k > 0.62) ctx.lineTo(ex + (rx - ex) * Math.min(1, (k - 0.62) / 0.38), ey)
+      ctx.stroke()
+      ctx.globalAlpha = Math.max(0, (k - 0.6) / 0.4)
+      ctx.textAlign = dir < 0 ? 'right' : 'left'
+      const tx = ex + dir * 8 * u
+      ctx.font = `600 ${Math.round(40 * u)}px ${FONT}`
+      ctx.fillText(a.text, tx, ey - 14 * u)
+      if (a.sub !== undefined) {
+        ctx.globalAlpha *= 0.78
+        ctx.font = `${Math.round(22 * u)}px ${FONT}`
+        ctx.fillText(a.sub, tx, ey + 32 * u)
+      }
+      ctx.restore()
+      continue
+    }
+    ctx.globalAlpha = a.alpha
+    ctx.textAlign = 'left'
     ctx.font = `600 ${Math.round(46 * u)}px ${FONT}`
-    ctx.fillText(a.text.toUpperCase(), x, y + 46 * u)
+    ctx.fillText(a.text, W * 0.075, y + 46 * u)
     if (a.sub !== undefined) {
       ctx.globalAlpha = a.alpha * 0.78
       ctx.font = `${Math.round(24 * u)}px ${FONT}`
-      ctx.fillText(a.sub, x, y + 84 * u)
+      ctx.fillText(a.sub, W * 0.075, y + 84 * u)
     }
     ctx.restore()
     y += 110 * u

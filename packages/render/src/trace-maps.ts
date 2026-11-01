@@ -115,7 +115,7 @@ const ROLE_LOOK: Record<TraceGroup['kind'], { cool: boolean; grow: number; pulse
 const INRUSH = 1.6 / 24
 
 /** the routing tip: white-hot at the head, cooling to bare copper along a tail of about a beat */
-const HEAD = { gain: 0.45, tail: 0.045, cool: 0.03 }
+const HEAD = { gain: 0.5, tail: 0.045 }
 /** an unreached pad: a dark mark in the laminate */
 const GHOST = 0.12
 /** how long a pad takes to plate once reached */
@@ -295,7 +295,7 @@ export function drawMaps(maps: MapSet, tl: TraceTimeline, p: number, region: Reg
   for (const layer of s.layers) {
     if (layer.side === topSide) drawCopperLayer(top, head, warm, cool, layer, s, p)
   }
-  // pads: a dark mark from the first frame; each plates, with a flash of heat, when the routing reaches it
+  // pads: a dark mark from the first frame; each plates when the routing reaches it
   for (const pad of s.pads) {
     if (pad.side === 'B' && topSide === 'F') continue
     const k = within(p, pad.t, pad.t + PLATE)
@@ -313,16 +313,6 @@ export function drawMaps(maps: MapSet, tl: TraceTimeline, p: number, region: Reg
       top.fill()
     }
     top.restore()
-    const flash = HEAD.gain * 0.3 * (1 - (p - pad.t) / HEAD.cool)
-    if (p >= pad.t && flash > 0) {
-      head.ctx.save()
-      head.ctx.translate(pad.x, pad.y)
-      head.ctx.rotate(pad.rot)
-      padPath(head.ctx, pad.w, pad.h, pad.shape)
-      head.ctx.fillStyle = ink(head.ch, flash)
-      head.ctx.fill()
-      head.ctx.restore()
-    }
   }
   // vias: a copper ring once the routing reaches them
   top.strokeStyle = ink(0)

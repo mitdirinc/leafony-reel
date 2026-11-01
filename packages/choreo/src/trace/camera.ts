@@ -144,3 +144,48 @@ export function fitZoom(
   }
   return lo
 }
+
+/**
+ * The look-at point that centres these points in frame at this zoom.
+ * Perspective pushes a tilted board low and off to one side, so centring the
+ * board's middle does not centre its picture; a few Newton steps on the
+ * projected bounds' centre do.
+ */
+export function centreOn(
+  shot: Omit<CameraShot, 't' | 'cut'>,
+  pts: Array<[number, number, number]>,
+  W: number,
+  H: number
+): { x: number; y: number } {
+  const mid = (x: number, y: number): [number, number] => {
+    const cam = makeCam({ ...shot, x, y }, W, H)
+    let x0 = Infinity
+    let x1 = -Infinity
+    let y0 = Infinity
+    let y1 = -Infinity
+    for (const [px, py, pz] of pts) {
+      const q = project(cam, px, py, pz)
+      x0 = Math.min(x0, q.x)
+      x1 = Math.max(x1, q.x)
+      y0 = Math.min(y0, q.y)
+      y1 = Math.max(y1, q.y)
+    }
+    return [(x0 + x1) / 2, (y0 + y1) / 2 - (shot.shift ?? 0)]
+  }
+  let { x, y } = shot
+  const h = 0.01 * Math.min(W, H)
+  for (let i = 0; i < 4; i++) {
+    const [cx, cy] = mid(x, y)
+    const [ax, ay] = mid(x + h, y)
+    const [bx, by] = mid(x, y + h)
+    const j00 = (ax - cx) / h
+    const j10 = (ay - cy) / h
+    const j01 = (bx - cx) / h
+    const j11 = (by - cy) / h
+    const det = j00 * j11 - j01 * j10
+    if (Math.abs(det) < 1e-12) break
+    x -= (j11 * cx - j01 * cy) / det
+    y -= (-j10 * cx + j00 * cy) / det
+  }
+  return { x, y }
+}
