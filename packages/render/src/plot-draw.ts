@@ -8,6 +8,9 @@ type Pt = [number, number]
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
 /** how long the red pen stays on a signal net as it passes, in film phase */
 const PASS = 0.03
+/** the hero wakes this long after power-on; its pen then takes INRUSH to cross the board (as in trace-maps) */
+const WAKE = 1 / 24
+const INRUSH = 1.75 / 24
 /** the light's direction across the plane, for the wash on body sides */
 const LIGHT = -2.2
 const mixHex = (a: string, b: string, t: number): string => {
@@ -261,7 +264,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
   }
 
   const topSide = s.layers.some((l) => l.side === 'F') ? 'F' : (s.layers[s.layers.length - 1]?.side ?? 'F')
-  const hair = 0.9 * u
+  const hair = 1.05 * u
   for (const layer of s.layers) {
     const front = layer.side === topSide
     const segs = layer.segs
@@ -351,6 +354,36 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0)
 
+  // a beat after power-on the hero wakes, and the red pen runs out across every trace in the order it was drawn
+  const w0 = A.power[0] + WAKE
+  if (p >= w0 && p < w0 + INRUSH + PASS) {
+    const wave = INRUSH / Math.max(1e-6, A.draw[1] - A.draw[0])
+    ctx.strokeStyle = red
+    ctx.lineWidth = 1.3 * u
+    for (const layer of s.layers) {
+      if (layer.side !== topSide) continue
+      const path = new Path2D()
+      for (let j = 0; j * 7 + 6 < layer.segs.length; j++) {
+        const o = j * 7
+        const a0 = w0 + ((layer.segs[o + 5] as number) - A.draw[0]) * wave
+        if (a0 > p) break
+        const span = Math.max(1e-6, ((layer.segs[o + 6] as number) - (layer.segs[o + 5] as number)) * wave)
+        const k = clamp01((p - a0) / span)
+        const k0 = clamp01((p - PASS - a0) / span)
+        if (k0 >= k) continue
+        const ax = layer.segs[o] as number
+        const ay = layer.segs[o + 1] as number
+        const dx = (layer.segs[o + 2] as number) - ax
+        const dy = (layer.segs[o + 3] as number) - ay
+        const a = toScreen(v, ax + dx * k0, ay + dy * k0)
+        const b = toScreen(v, ax + dx * k, ay + dy * k)
+        if (!a || !b) continue
+        path.moveTo(a[0], a[1])
+        path.lineTo(b[0], b[1])
+      }
+      ctx.stroke(path)
+    }
+  }
   if (p >= A.power[0]) {
     ctx.strokeStyle = red
     ctx.lineWidth = 1.6 * u
