@@ -24,7 +24,7 @@ export function drawTitle(ctx: CanvasRenderingContext2D, tl: Timeline, p: number
   const win = titleWindow(tl)
   if (win === undefined) return
   const t0 = win[0]
-  const aIn = ease((p - t0) / 0.02)
+  const aIn = ease((p - t0) / (tl.style === 'glyph' ? 0.02 : 0.06))
   if (aIn <= 0) return
   const alpha = aIn * fadeAlpha
   if (alpha <= 0.002) return
@@ -32,7 +32,9 @@ export function drawTitle(ctx: CanvasRenderingContext2D, tl: Timeline, p: number
   const a = safeArea(tl.width, tl.height, true)
   const bandTop = a.y + a.h
   const nameSize = 0.048 * Math.min(tl.width, tl.height)
-  const typeK = ease((p - t0) / 0.03)
+  // glyph types its title on; the trace and plot films fade it in whole
+  const typed = tl.style === 'glyph'
+  const typeK = typed ? ease((p - t0) / 0.03) : 1
 
   ctx.save()
   ctx.textAlign = 'left'
@@ -59,7 +61,7 @@ export function drawTitle(ctx: CanvasRenderingContext2D, tl: Timeline, p: number
     ctx.moveTo(a.x, ruleY)
     ctx.lineTo(a.x + 0.12 * tl.width * typeK, ruleY)
     ctx.stroke()
-    const shownV = card.version.substring(0, Math.ceil(card.version.length * ease((p - t0 - 0.015) / 0.03)))
+    const shownV = typed ? card.version.substring(0, Math.ceil(card.version.length * ease((p - t0 - 0.015) / 0.03))) : card.version
     ctx.font = `${nameSize * 0.55}px ${FONT}`
     ctx.globalAlpha = alpha * 0.75
     if (shownV.length > 0) ctx.fillText(shownV, a.x, ruleY + 0.032 * tl.height)

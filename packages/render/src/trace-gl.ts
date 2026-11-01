@@ -156,11 +156,12 @@ void main(){
   vec3 col = mix(baseSub, baseCu, cu);
   col = mix(col, mix(baseCu, basePad, uFinishOn), pad);
   // the mask clears every pad by a lip and follows the copper relief beneath.
-  // the coat creeps out from the hero with a ragged, feathered front: no rim to read as a lens
+  // the coat creeps out from the hero with a ragged front, never a clean circle
   float py = length(vec2(vW.x, -vW.y) - uOrigin) + (vnoise(mm * 0.4) - 0.5) * uMaskSoft * 2.5;
   float padNear = textureLod(tTop, vUv, 1.4).g;
   float clearance = smoothstep(0.04, 0.22, padNear);
-  float poured = smoothstep(uMaskFront, uMaskFront - uMaskSoft * 1.6, py);
+  float poured = smoothstep(uMaskFront, uMaskFront - uMaskSoft * 0.45, py);
+  float front = uMaskOn * exp(-sq((py - uMaskFront + uMaskSoft * 0.2) / (uMaskSoft * 0.1))) * (1.0 - poured * 0.5);
   float masked = uMaskOn * poured * (1.0 - max(pad, clearance)) * (1.0 - hole);
   vec2 lip = gradC(tTop, 1, 2.0, 1.4) * uBump * 0.8 * uMaskOn;
   // under the coat the relief softens: traces read as gentle ridges, not engraved lines
@@ -171,6 +172,8 @@ void main(){
   vec3 maskAlb = mix(uMask * sink, min(uMask * lift + uCopper * mix(0.018, 0.02, uMaskLuma), vec3(0.82)), cu);
   vec3 maskC = shade(Nm, V, maskAlb, 0.0, mix(0.08, 0.16, uCured), 0.05);
   col = mix(col, maskC, masked);
+  // the coat's edge catches the key, so even a black coat is seen arriving
+  col += vec3(0.1, 0.105, 0.11) * front * (1.0 - uMaskLuma) * (1.0 - max(pad, hole));
   vec3 Ns = normalize(vec3(-gs.x, gs.y, 1.0));
   col = mix(col, shade(Ns, V, uSilk, 0.0, 0.7, 0.04), silk * (0.4 + 0.6 * poured * uMaskOn));
   float drill = hole * (1.0 - pad);
@@ -1076,7 +1079,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
           .v3('uSub', linear(m.substrate)).v3('uSilk', linear(m.silk)).v3('uWarm', warmC).v3('uCool', coolC).f('uHead', 1.3, 1.12, 0.92)
           .f('uFinishRough', m.finishRough).f('uMaskFront', maskFront).f('uMaskSoft', soft).f('uMaskOn', maskOn).f('uMaskLuma', Math.pow(maskLuma, 1 / 2.2))
           .f('uCured', span([acts.mask[1], acts.mask[1] + 0.04])).f('uFinishOn', span([acts.mask[1] - 0.01, acts.mask[1] + 0.02]))
-          .f('uEnergy', energyGain).f('uFlare', p >= acts.power[0] ? 4 : 0).f('uPxPerMm', m.pxPerMm).f('uBump', 1.6)
+          .f('uEnergy', energyGain).f('uFlare', p >= acts.power[0] ? 2.5 : 0).f('uPxPerMm', m.pxPerMm).f('uBump', 1.6)
           .f('uOrigin', s.origin.x, s.origin.y).f('uDark', 1 - span([acts.draw[1] - 1 / 24, acts.mask[0] + 0.5 / 24]))
         lighting(P.top, c, p, room)
         g.drawArrays(g.TRIANGLE_STRIP, 0, 4)
