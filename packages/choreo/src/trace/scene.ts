@@ -877,7 +877,11 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
   const bench0 = { ...si.hero, tilt: 50 * D, yaw: benchYaw - 16 * D, aperture: 0.4 }
   const bench1 = { ...si.hero, tilt: 44 * D, yaw: benchYaw + 16 * D, aperture: 0.4 }
   const wide = { ...mid, tilt: 38 * D, yaw: heroYaw, aperture: 0.05, shift }
-  const poster = { ...mid, tilt: 38 * D, yaw: -heroYaw * 1.4, aperture: 0.08, shift: shift === undefined ? undefined : shift * 0.5 }
+  // the poster's heading keeps the hero in sight: of a few diagonals, the one where nothing nearer the lens covers it
+  const posterYaw = [-1.4, -1, 1, 1.4, -0.6, 0.6].map((k) => k * heroYaw).filter((y) => Math.abs(wrap(y)) <= 80 * D)
+    .map((y, i) => ({ y, cost: blocked(y, 38 * D, 1.2) + i * 0.01 }))
+    .sort((a, b) => a.cost - b.cost)[0]?.y ?? -heroYaw * 1.4
+  const poster = { ...mid, tilt: 38 * D, yaw: posterYaw, aperture: 0.08, shift: shift === undefined ? undefined : shift * 0.5 }
   // the poster holds the board and a connector overhanging its edge, but not a part standing well clear of it
   const reach = 0.08 * Math.max(x1 - x0, y1 - y0)
   const off = si.bodies.filter(([bx, by]) => (bx < x0 || bx > x1 || by < y0 || by > y1) &&

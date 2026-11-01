@@ -894,7 +894,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
         part.rot, part.z, KIND_ID[part.kind] ?? 10, part.t,
         col, row, third, part.hero === true ? 1 : 0,
         part.skew[0], part.skew[1], part.skew[2], part.settle,
-        ...(part.led === undefined ? [0, 0, 0, 0] : [...linear(part.led.color).map((c) => c * (part.led?.gain ?? 1)), part.led.at])
+        ...(part.led === undefined ? [0, 0, 0, 0] : [...linear(part.led.color).map((c) => c * 0.5 * (part.led?.gain ?? 1)), part.led.at])
       ]
     }
     // boxes first, round bodies after: each set draws with its own mesh
@@ -1085,7 +1085,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
           .v3('uSub', linear(m.substrate)).v3('uSilk', linear(m.silk)).v3('uWarm', warmC).v3('uCool', coolC).f('uHead', 1.3, 1.12, 0.92)
           .f('uFinishRough', m.finishRough).f('uMaskFront', maskFront).f('uMaskSoft', soft).f('uMaskOn', maskOn).f('uMaskLuma', Math.pow(maskLuma, 1 / 2.2))
           .f('uCured', span([acts.mask[1], acts.mask[1] + 0.04])).f('uFinishOn', span([acts.mask[1] - 0.01, acts.mask[1] + 0.02]))
-          .f('uEnergy', energyGain).f('uFlare', p >= acts.power[0] ? 2 : 0).f('uPxPerMm', m.pxPerMm).f('uBump', 1.6)
+          .f('uEnergy', energyGain).f('uFlare', p >= acts.power[0] ? 1.6 : 0).f('uPxPerMm', m.pxPerMm).f('uBump', 1.6)
           .f('uOrigin', s.origin.x, s.origin.y).f('uMaskDir', ...maskDir).f('uDark', 1 - span([acts.draw[1] - 1 / 24, acts.mask[0] + 0.5 / 24]))
         lighting(P.top, c, p, room)
         g.drawArrays(g.TRIANGLE_STRIP, 0, 4)

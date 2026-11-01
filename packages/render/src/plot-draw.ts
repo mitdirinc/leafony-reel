@@ -488,7 +488,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
   bodies.sort((a, b) => b.d - a.d)
   for (const { part, at } of bodies) {
     // a tall housing is capped low, so no blank block outweighs the hero; the hero keeps a package's proportions
-    const z = part.hero === true ? Math.min(part.z, 0.2 * Math.min(part.w, part.h)) : Math.min(part.z, 2 * m.pxPerMm)
+    const z = part.hero === true ? Math.min(part.z, 0.12 * Math.min(part.w, part.h)) : Math.min(part.z, 2 * m.pxPerMm)
     const cr = Math.cos(at.rot)
     const sr = Math.sin(at.rot)
     const ring = (z: number, n: number, round: boolean): Pt[] => {
@@ -508,8 +508,8 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     const bot = ring(0, n, round)
     if (top.length < n || bot.length < n) continue
     ctx.strokeStyle = part.hero === true ? red : pen2
-    const edge = (part.hero === true ? 2.4 : 1.2) * u
-    ctx.lineWidth = (part.hero === true ? 1.1 : 0.5) * u
+    const edge = (part.hero === true ? 2.4 : 0.8) * u
+    ctx.lineWidth = (part.hero === true ? 1.1 : 0.4) * u
     // hidden-line boxes: opaque paper, a fine pen for the creases; the far faces go down first so every near face closes the box
     if (round) fillStroke(ctx, hull([...top, ...bot]), paper)
     else {
