@@ -869,13 +869,13 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
     }, 0) / Math.max(1e-6, (hero.x1 - hero.x0) * (hero.y1 - hero.y0))
   }
   const benchYaw = Array.from({ length: 24 }, (_, i) => (i * 15 - 165) * D)
-    .map((y) => ({ y, cost: blocked(y - 11 * D, 60 * D) + blocked(y + 11 * D, 54 * D, lens * 1.2) + Math.abs(wrap(y + 19 * D)) * 0.02 + (Math.abs(wrap(y)) > 80 * D ? 1e6 : 0) }))
+    .map((y) => ({ y, cost: blocked(y - 16 * D, 50 * D) + blocked(y + 16 * D, 44 * D, lens * 1.3) + Math.abs(wrap(y + 19 * D)) * 0.02 + (Math.abs(wrap(y)) > 80 * D ? 1e6 : 0) }))
     .sort((a, b) => a.cost - b.cost)[0]?.y ?? -19 * D
   const powerYaw = Array.from({ length: 17 }, (_, i) => (i * 10 - 80) * D)
     .map((y) => ({ y, cost: blocked(y, 20 * D, lens * 1.3) + Math.abs(wrap(y - openYaw)) * 0.02 + (Math.abs(wrap(y)) > 80 * D ? 1e6 : 0) }))
     .sort((a, b) => a.cost - b.cost)[0]?.y ?? openYaw
-  const bench0 = { ...si.hero, tilt: 60 * D, yaw: benchYaw - 11 * D, aperture: 0.4 }
-  const bench1 = { ...si.hero, tilt: 54 * D, yaw: benchYaw + 11 * D, aperture: 0.4 }
+  const bench0 = { ...si.hero, tilt: 50 * D, yaw: benchYaw - 16 * D, aperture: 0.4 }
+  const bench1 = { ...si.hero, tilt: 44 * D, yaw: benchYaw + 16 * D, aperture: 0.4 }
   const wide = { ...mid, tilt: 38 * D, yaw: heroYaw, aperture: 0.05, shift }
   const poster = { ...mid, tilt: 38 * D, yaw: -heroYaw * 1.4, aperture: 0.08, shift: shift === undefined ? undefined : shift * 0.5 }
   // the poster holds the board and a connector overhanging its edge, but not a part standing well clear of it
@@ -906,7 +906,7 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
     { t: a.draw[1], ...drawnIn },
     { t: a.place[0] - 0.001, ...leanIn },
     { t: a.place[0], ...bench0, zoom: benchZoom, cut: true },
-    { t: a.reflow[1] - 0.001, ...bench1, zoom: benchZoom * 1.2 },
+    { t: a.reflow[1] - 0.001, ...bench1, zoom: benchZoom * 1.3 },
     // power-on looks down on the hero from near the opening's heading, the side with no tall body in the way, and pulls back as its light runs out
     { t: a.reflow[1], ...si.hero, tilt: 20 * D, yaw: powerYaw, zoom: Math.max(aliveZoom * 1.3, Math.min(macro * 0.5, benchZoom * 1.3)), aperture: 0.25, cut: true },
     { t: 20 / 24 - 0.001, ...alive, yaw: powerYaw, tilt: 26 * D, zoom: aliveZoom * 1.04 },

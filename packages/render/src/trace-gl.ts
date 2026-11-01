@@ -1085,7 +1085,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
           .v3('uSub', linear(m.substrate)).v3('uSilk', linear(m.silk)).v3('uWarm', warmC).v3('uCool', coolC).f('uHead', 1.3, 1.12, 0.92)
           .f('uFinishRough', m.finishRough).f('uMaskFront', maskFront).f('uMaskSoft', soft).f('uMaskOn', maskOn).f('uMaskLuma', Math.pow(maskLuma, 1 / 2.2))
           .f('uCured', span([acts.mask[1], acts.mask[1] + 0.04])).f('uFinishOn', span([acts.mask[1] - 0.01, acts.mask[1] + 0.02]))
-          .f('uEnergy', energyGain).f('uFlare', p >= acts.power[0] ? 2.5 : 0).f('uPxPerMm', m.pxPerMm).f('uBump', 1.6)
+          .f('uEnergy', energyGain).f('uFlare', p >= acts.power[0] ? 2 : 0).f('uPxPerMm', m.pxPerMm).f('uBump', 1.6)
           .f('uOrigin', s.origin.x, s.origin.y).f('uMaskDir', ...maskDir).f('uDark', 1 - span([acts.draw[1] - 1 / 24, acts.mask[0] + 0.5 / 24]))
         lighting(P.top, c, p, room)
         g.drawArrays(g.TRIANGLE_STRIP, 0, 4)

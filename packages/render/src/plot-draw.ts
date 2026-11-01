@@ -278,7 +278,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     ctx.lineWidth = front ? hair : 0.7 * u
     ctx.stroke(quiet)
     ctx.strokeStyle = ink
-    ctx.lineWidth = hair
+    ctx.lineWidth = 1.7 * u
     ctx.stroke(thin)
     for (const [w, path] of wide) {
       ctx.strokeStyle = ink
