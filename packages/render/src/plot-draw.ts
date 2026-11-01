@@ -6,6 +6,14 @@ import { drawTitle } from './title'
 type Pt = [number, number]
 
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
+/** how long the red pen stays on a signal net as it passes, in film phase */
+const PASS = 0.03
+/** the light's direction across the plane, for the wash on body sides */
+const LIGHT = -2.2
+const mixHex = (a: string, b: string, t: number): string => {
+  const c = (h: string, i: number): number => Number.parseInt(h.slice(1 + 2 * i, 3 + 2 * i), 16)
+  return `#${[0, 1, 2].map((i) => Math.round(c(a, i) + (c(b, i) - c(a, i)) * t).toString(16).padStart(2, '0')).join('')}`
+}
 const ease = (x: number): number => {
   const t = clamp01(x)
   return t * t * (3 - 2 * t)
@@ -149,7 +157,8 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
   ctx.lineJoin = 'round'
   let drawn = 0
 
-  const outlineFrac = ease((p - A.draw[0]) / Math.max(1e-6, (A.draw[1] - A.draw[0]) * 0.35))
+  // the pen closes the board's edge as the camera pulls back to show it, not as stray lines across the macro
+  const outlineFrac = ease((p - (A.draw[0] + (A.draw[1] - A.draw[0]) * 0.45)) / Math.max(1e-6, (A.draw[1] - A.draw[0]) * 0.55))
   ctx.strokeStyle = ink
   if (outlineFrac >= 1) {
     ctx.lineWidth = 1.1 * u
@@ -352,12 +361,19 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
         const e0 = layer.energy[j * 2] as number
         const e1 = layer.energy[j * 2 + 1] as number
         if (e0 < 0 || p < e0) continue
-        const k = clamp01((p - e0) / Math.max(1e-6, e1 - e0))
+        // the rails keep their red; every other net carries the pen past and returns to ink
+        const rail = s.groups[layer.groups[j] as number]?.kind === 'power'
+        const span = Math.max(1e-6, e1 - e0)
+        const k = clamp01((p - e0) / span)
+        const k0 = rail ? 0 : clamp01((p - PASS - e0) / span)
+        if (k0 >= k) continue
         const o = j * 7
         const ax = layer.segs[o] as number
         const ay = layer.segs[o + 1] as number
-        const a = toScreen(v, ax, ay)
-        const b = toScreen(v, ax + ((layer.segs[o + 2] as number) - ax) * k, ay + ((layer.segs[o + 3] as number) - ay) * k)
+        const dx = (layer.segs[o + 2] as number) - ax
+        const dy = (layer.segs[o + 3] as number) - ay
+        const a = toScreen(v, ax + dx * k0, ay + dy * k0)
+        const b = toScreen(v, ax + dx * k, ay + dy * k)
         if (!a || !b) continue
         path.moveTo(a[0], a[1])
         path.lineTo(b[0], b[1])
@@ -483,6 +499,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     bodies.push({ part, at, d })
   }
   bodies.sort((a, b) => b.d - a.d)
+  const side = [0.05, 0.11, 0.2].map((t) => mixHex(paper, ink, t))
   for (const { part, at } of bodies) {
     const cr = Math.cos(at.rot)
     const sr = Math.sin(at.rot)
@@ -505,12 +522,14 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     const lit = part.led !== undefined && p >= A.power[0] + 0.02
     ctx.strokeStyle = part.hero === true || lit ? red : ink
     ctx.lineWidth = (part.hero === true ? 1.6 : 1) * u
-    if (round) fillStroke(ctx, hull([...top, ...bot]), paper)
+    // sides take a light wash by how they face the light, so a body reads as a solid, not a hole in the drawing
+    if (round) fillStroke(ctx, hull([...top, ...bot]), side[1] as string)
     else {
       for (let i = 0; i < 4; i++) {
         const j = (i + 1) % 4
         const face: Pt[] = [bot[i] as Pt, bot[j] as Pt, top[j] as Pt, top[i] as Pt]
-        if (cross2(bot[i] as Pt, bot[j] as Pt, top[j] as Pt) < 0) fillStroke(ctx, face, paper)
+        const facing = Math.cos(at.rot + (i * Math.PI) / 2 - LIGHT)
+        if (cross2(bot[i] as Pt, bot[j] as Pt, top[j] as Pt) < 0) fillStroke(ctx, face, side[facing > 0.3 ? 0 : facing > -0.3 ? 1 : 2] as string)
       }
     }
     fillStroke(ctx, top, paper)
