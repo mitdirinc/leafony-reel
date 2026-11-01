@@ -20,14 +20,14 @@ const B = 1 / 24
 
 /**
  * The score, on a grid of 24 beats. Drawing: seen from above, copper routes
- * out from the hero and the pours fill. Object: the camera tilts down while
- * the mask coats and the silk prints; parts sit on wet paste until the
+ * out from the hero. Object: the camera tilts down while the mask coats, the
+ * pours fill under it and the silk prints; parts sit on wet paste until the
  * reflow front snaps them square. Alive: first power-on. The rails fill,
  * the clock starts, data runs. Hold: the running board.
  */
 export const TRACE_ACTS: TraceActs = {
   draw: [0, 5.5 * B],
-  pour: [7.5 * B, 8.5 * B],
+  pour: [8.5 * B, 9.5 * B],
   mask: [6.5 * B, 8.5 * B],
   silk: [9 * B, 10.5 * B],
   place: [10 * B, 13.5 * B],
@@ -840,8 +840,10 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
   const bench1 = { ...si.hero, tilt: 54 * D, yaw: benchYaw + 11 * D, aperture: 0.4 }
   const wide = { ...mid, tilt: 38 * D, yaw: heroYaw, aperture: 0.05, shift }
   const poster = { ...mid, tilt: 52 * D, yaw: -heroYaw * 0.7, aperture: 0.08, shift }
-  // the poster holds everything on the board, a connector hanging off its edge included
-  const off = si.bodies.filter(([bx, by]) => bx < x0 || bx > x1 || by < y0 || by > y1)
+  // the poster holds the board and a connector overhanging its edge, but not a part standing well clear of it
+  const reach = 0.08 * Math.max(x1 - x0, y1 - y0)
+  const off = si.bodies.filter(([bx, by]) => (bx < x0 || bx > x1 || by < y0 || by > y1) &&
+    bx > x0 - reach && bx < x1 + reach && by > y0 - reach && by < y1 + reach)
   const allPts: Array<[number, number, number]> = [...corners(0), ...off.flatMap(([bx, by, bz, bl]): Array<[number, number, number]> =>
     [[bx - bl / 2, by - bl / 2, bz], [bx + bl / 2, by - bl / 2, bz], [bx - bl / 2, by + bl / 2, bz], [bx + bl / 2, by + bl / 2, bz]])]
   const posterA = framed(poster, 1.12, allPts)

@@ -22,6 +22,8 @@ export interface Annotation {
   alpha: number
   /** the part it names, in screen px */
   anchor?: { x: number; y: number } | undefined
+  /** which way the leader runs, fixed for the whole callout so it never jumps sides */
+  side?: -1 | 1 | undefined
 }
 
 export interface TraceGL {
@@ -1030,7 +1032,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
       // lights down for the held breath, so the board's own light carries power-on; the studio comes
       // most of the way back before the poster cut, leaving room for the lit rails to read in the hold
       const out = 0.45 + 0.3 * Math.pow(maskLuma, 1 / 2.2)
-      const room = 1 - out * span([acts.reflow[1], acts.power[0]]) + out * 0.6 * span([18.5 / 24, 20 / 24])
+      const room = 1 - out * span([acts.reflow[1], acts.power[0]]) + out * (0.6 - 0.25 * Math.pow(maskLuma, 1 / 2.2)) * span([18.5 / 24, 20 / 24])
       const heatSpan = (acts.reflow[1] - acts.reflow[0]) - 0.5 / 24
       const heatU = (p - acts.reflow[0]) / heatSpan
       const heat = Math.min(span([acts.reflow[0] - 0.01, acts.reflow[0] + 0.01]), 1 - span([acts.reflow[1] - 0.01, acts.reflow[1] + 0.01]))
@@ -1278,7 +1280,9 @@ function annotate(tl: TraceTimeline, p: number, cam: Cam, W: number, H: number):
     .filter((c) => p >= c.t0 && p <= c.t1)
     .map((c) => {
       const q = project(cam, c.x, c.y, top)
+      const mid = project(makeCam(sampleShot(tl.scene.shots, (c.t0 + c.t1) / 2), W, H), c.x, c.y, top)
       return {
+        side: mid.x < 0 ? -1 as const : 1 as const,
         text: c.text,
         sub: c.sub,
         alpha: Math.min(ease((p - c.t0) / 0.035), ease((c.t1 - p) / 0.012)),

@@ -44,9 +44,7 @@ export function drawAnnotations(ctx: CanvasRenderingContext2D, anns: Annotation[
       ctx.font = `${Math.round(22 * u)}px ${FONT}`
       const rule = Math.max(named, a.sub === undefined ? 0 : ctx.measureText(a.sub).width) + 16 * u
       const rise = Math.min(0.2 * H, Math.max(0.08 * H, ay - 0.16 * H))
-      const fits = (d: number): boolean => x + d * (rise + rule) > W * 0.06 && x + d * (rise + rule) < W * 0.94
-      const away = x < W / 2 ? -1 : 1
-      const dir = fits(away) ? away : -away
+      const dir = a.side ?? (x < W / 2 ? -1 : 1)
       // the whole label stays inside the safe area, however the part moves
       const ex = Math.min(W * 0.94 - (dir > 0 ? rule : 0), Math.max(W * 0.06 + (dir < 0 ? rule : 0), x + dir * rise))
       const ey = Math.max(H * 0.08 + 40 * u, ay - rise)

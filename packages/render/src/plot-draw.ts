@@ -6,8 +6,6 @@ import { drawTitle } from './title'
 type Pt = [number, number]
 
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
-/** the light's direction across the plane, for the wash on body sides */
-const LIGHT = -2.2
 const mixHex = (a: string, b: string, t: number): string => {
   const c = (h: string, i: number): number => Number.parseInt(h.slice(1 + 2 * i, 3 + 2 * i), 16)
   return `#${[0, 1, 2].map((i) => Math.round(c(a, i) + (c(b, i) - c(a, i)) * t).toString(16).padStart(2, '0')).join('')}`
@@ -478,7 +476,6 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     bodies.push({ part, at, d })
   }
   bodies.sort((a, b) => b.d - a.d)
-  const side = [0.03, 0.07, 0.12].map((t) => mixHex(paper, ink, t))
   for (const { part, at } of bodies) {
     const cr = Math.cos(at.rot)
     const sr = Math.sin(at.rot)
@@ -501,20 +498,22 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     const lit = part.led !== undefined && part.led.at >= 0 && p >= part.led.at
     ctx.strokeStyle = part.hero === true || lit ? red : pen2
     ctx.lineWidth = (part.hero === true ? 2.2 : 0.9) * u
-    // every body but the hero is a ghost: thin paper over the drawing, so housings never outweigh the subject
-    ctx.globalAlpha = part.hero === true ? 1 : 0.6
-    // sides take a light wash by how they face the light, so a body reads as a solid, not a hole in the drawing
-    if (round) fillStroke(ctx, hull([...top, ...bot]), side[1] as string)
+    // hidden-line boxes: opaque paper, one light pen; the far faces go down first so every near face closes the box
+    if (round) fillStroke(ctx, hull([...top, ...bot]), paper)
     else {
-      for (let i = 0; i < 4; i++) {
+      const faces = [0, 1, 2, 3].map((i) => {
         const j = (i + 1) % 4
-        const face: Pt[] = [bot[i] as Pt, bot[j] as Pt, top[j] as Pt, top[i] as Pt]
-        const facing = Math.cos(at.rot + (i * Math.PI) / 2 - LIGHT)
-        if (cross2(bot[i] as Pt, bot[j] as Pt, top[j] as Pt) < 0) fillStroke(ctx, face, side[facing > 0.3 ? 0 : facing > -0.3 ? 1 : 2] as string)
-      }
+        const pts: Pt[] = [bot[i] as Pt, bot[j] as Pt, top[j] as Pt, top[i] as Pt]
+        const lx = (i === 0 ? 0 : i === 1 ? 0.5 : i === 2 ? 0 : -0.5) * part.w
+        const ly = (i === 0 ? -0.5 : i === 1 ? 0 : i === 2 ? 0.5 : 0) * part.h
+        const fx = at.x + lx * cr - ly * sr
+        const fy = at.y + lx * sr + ly * cr
+        return { pts, d: Math.hypot(fx - eye[0], -fy - eye[1], at.lift + part.z / 2 - eye[2]) }
+      })
+      faces.sort((x, y) => y.d - x.d)
+      for (const f of faces) fillStroke(ctx, f.pts, paper)
     }
     fillStroke(ctx, top, paper)
-    ctx.globalAlpha = 1
     if (part.kind === 'conn' && part.pitch !== undefined && part.pitch > 0) {
       const nx = Math.max(1, Math.floor(part.w / part.pitch))
       const ny = Math.max(1, Math.floor(part.h / part.pitch))

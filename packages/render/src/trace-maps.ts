@@ -99,15 +99,15 @@ function streak(
 
 /**
  * How each role reads once the board is powered: the rails are warm and stay
- * lit; the hero's own lines carry one cool streak out of it and go quiet.
+ * lit; the hero's own lines carry one cool streak out of it and settle to an ember.
  */
 const ROLE_LOOK: Record<TraceGroup['kind'], { cool: boolean; grow: number; tail: number; steady: number }> = {
   power: { cool: false, grow: 1.2, tail: 0.06, steady: 0.4 },
   ground: { cool: false, grow: 0, tail: 0.01, steady: 0 },
-  clock: { cool: true, grow: 0.9, tail: 0.03, steady: 0 },
-  bus: { cool: true, grow: 0.8, tail: 0.03, steady: 0 },
-  diff: { cool: true, grow: 0.8, tail: 0.03, steady: 0 },
-  signal: { cool: true, grow: 0.6, tail: 0.03, steady: 0 }
+  clock: { cool: true, grow: 0.9, tail: 0.03, steady: 0.12 },
+  bus: { cool: true, grow: 0.8, tail: 0.03, steady: 0.12 },
+  diff: { cool: true, grow: 0.8, tail: 0.03, steady: 0.12 },
+  signal: { cool: true, grow: 0.6, tail: 0.03, steady: 0.12 }
 }
 
 /** the hero wakes this long after power-on, once the rails have reached it */
@@ -273,16 +273,16 @@ export function drawMaps(maps: MapSet, tl: TraceTimeline, p: number, region: Reg
   // the hero wakes as the rails reach it: light leaks out from under its body, then settles to a glow
   const wake = s.acts.power[0] + WAKE
   if (p >= wake) {
-    const k = 0.38 + 0.4 * Math.max(0, 1 - (p - wake) / 0.04)
+    const k = 0.6 + 0.3 * Math.max(0, 1 - (p - wake) / 0.04)
     for (const part of s.parts) {
       if (part.hero !== true) continue
       top.save()
       top.translate(part.x, part.y)
       top.rotate(part.rot)
       const rim = 0.11 * Math.min(part.w, part.h)
-      for (const [grow, a] of [[1, 0.35], [0.55, 0.6], [0.2, 1]] as const) {
-        const r = rim * grow
-        top.fillStyle = ink(2, k * a)
+      for (let ring = 0; ring < 6; ring++) {
+        const r = rim * (1 - ring * 0.17)
+        top.fillStyle = ink(2, k * 0.22)
         top.beginPath()
         top.rect(-part.w / 2 - r, -part.h / 2 - r, part.w + 2 * r, part.h + 2 * r)
         top.rect(-part.w / 2 + rim * 0.1, -part.h / 2 + rim * 0.1, part.w - rim * 0.2, part.h - rim * 0.2)
