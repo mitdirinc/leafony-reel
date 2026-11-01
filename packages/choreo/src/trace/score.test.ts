@@ -29,7 +29,7 @@ describe('the trace score', () => {
           expect(g === -1 || (g >= 0 && g < s.groups.length)).toBe(true)
           const t0 = layer.segs[i * 7 + 5] as number
           const t1 = layer.segs[i * 7 + 6] as number
-          expect(t0).toBeGreaterThanOrEqual(TRACE_ACTS.draw[0] - 1e-9)
+          expect(t0).toBeGreaterThanOrEqual(TRACE_ACTS.draw[0] - 0.5 / 24 - 1e-9)
           expect(t1).toBeLessThanOrEqual(TRACE_ACTS.draw[1] + 1e-9)
           expect(t1).toBeGreaterThanOrEqual(t0)
         }
@@ -63,8 +63,8 @@ describe('the trace score', () => {
       for (const c of cuts) expect(c.t * 48).toBeCloseTo(Math.round(c.t * 48), 6)
       const hero = s.shots.at(-1)
       expect(hero?.tilt).toBeGreaterThan(0.3)
-      expect(hero?.tilt).toBeLessThan(0.7)
-      expect(hero?.aperture).toBeLessThanOrEqual(0.05)
+      expect(hero?.tilt).toBeLessThan(1.0)
+      expect(hero?.aperture).toBeLessThanOrEqual(0.1)
     })
 
     it(`${name}: the hero frame holds the whole board`, () => {

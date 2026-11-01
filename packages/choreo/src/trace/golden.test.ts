@@ -56,11 +56,11 @@ describe('approved trace schedule', () => {
       .map((t) => Math.round(t * 1e4) / 1e4)
     expect(t0s).toMatchInlineSnapshot(`
       [
-        0,
-        0,
-        0,
-        0.0001,
-        0.0001,
+        -0.0208,
+        -0.0208,
+        -0.0208,
+        -0.0208,
+        -0.0207,
       ]
     `)
   })

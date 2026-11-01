@@ -193,6 +193,8 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
 
   // the routing: a wavefront out of the hero's pins, in even work per beat
   const [d0, d1] = acts.draw
+  // the routing is already leaving the hero on the first frame
+  const g0 = d0 - 0.5 * B
   const byStart = segs.map((_, i) => i).sort((a, b) => (g.start[a] as number) - (g.start[b] as number))
   const rank = new Map(byStart.map((segIdx, r) => [segIdx, r / Math.max(1, byStart.length - 1)]))
 
@@ -201,8 +203,8 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
   segs.forEach((s, i) => {
     const side = sideAt(s.layer)
     const u = 0.5 * (rank.get(i) ?? 0) + 0.5 * Math.min(1, (g.start[i] as number) / md)
-    const t0 = d0 + u * (d1 - d0) * 0.88
-    const t1 = Math.min(d1, t0 + Math.max(0.003, Math.pow((segLen[i] as number) / md, 0.85) * (d1 - d0) * 0.45))
+    const t0 = g0 + u * (d1 - g0) * 0.88
+    const t1 = Math.min(d1, t0 + Math.max(0.003, Math.pow((segLen[i] as number) / md, 0.85) * (d1 - g0) * 0.45))
     segT0[i] = t0
     const ends = g.flipped[i] === true ? [s.b, s.a] : [s.a, s.b]
     const a = map(ends[0] as Vec2)
@@ -260,7 +262,9 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
     return best
   }
 
-  // the parts are placed before the routing starts: every pad is there from the first frame
+  // every pad is placed before the routing starts, as a dark mark; it plates when the routing reaches it
+  const heroPads = new Set((hero?.pads ?? []).map((hp) => `${hp.pos.x.toFixed(3)},${hp.pos.y.toFixed(3)}`))
+  const [pour0] = acts.pour
   // mounting holes sit in copper layers but are really drills — plated:false
   // marks them; oversized pads draw as rings either way so they never blob
   const npth = board.drill.filter((d) => !d.plated)
@@ -270,6 +274,9 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
   const pads: TracePad[] = []
   for (const { pad, sides } of padLayerSets.values()) {
     const m = map(pad.pos)
+    const reached = heroPads.has(`${pad.pos.x.toFixed(3)},${pad.pos.y.toFixed(3)}`)
+      ? g0
+      : earliestAt(pad.pos, Math.max(pad.size.x, pad.size.y) / 2 + 0.1)
     pads.push({
       x: m.x,
       y: m.y,
@@ -277,7 +284,7 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
       h: Math.max(1.5, pad.size.y * fit.scale),
       rot: (back ? -pad.rot : pad.rot) * DEG + (fit.rotated ? Math.PI / 2 : 0),
       shape: padShape(pad),
-      t: 0,
+      t: Number.isFinite(reached) ? Math.max(g0, reached) : pour0,
       side: sides.size > 1 ? 'both' : ([...sides][0] === 'F' ? 'F' : 'B'),
       ring:
         Math.min(pad.size.x, pad.size.y) * fit.scale > 0.03 * pxMin ||
@@ -755,34 +762,38 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
   const fAspect = W / H
   const skew = Math.abs(Math.log(bAspect / fAspect))
   const heroYaw = (skew > 0.9 ? 30 : 18) * D * (bAspect > fAspect ? 1 : -1)
-  const fit = (shot: Omit<CameraShot, 't' | 'zoom' | 'cut'>, m = 1): number =>
-    fitZoom(shot, boardPts, W, H, 0.84 * m, (shot.shift === undefined ? 0.8 : 0.8 - shot.shift) * m)
+  const fit = (shot: Omit<CameraShot, 't' | 'zoom' | 'cut'>, m = 1, pts = boardPts): number =>
+    fitZoom(shot, pts, W, H, 0.84 * m, (shot.shift === undefined ? 0.8 : 0.8 - shot.shift) * m)
   // with a title card, the held shots frame the board above its band: a lens shift, not a tilt
   const band = resolved.title === undefined ? 0 : (H - (safe.y + safe.h)) / H
   const shift = band > 0 ? band - 0.01 : undefined
 
   const macro = Math.min(6, Math.max(1.6, (0.34 * Math.min(W, H)) / Math.max(1, si.heroSize)))
-  const plan = { ...mid, tilt: 0.5 * D, yaw: 6 * D, aperture: 0.02 }
   const tilted = { ...mid, tilt: 40 * D, yaw: heroYaw * 0.8, aperture: 0.05 }
-  const bench0 = { ...si.hero, tilt: 60 * D, yaw: -26 * D, aperture: 0.7 }
-  const bench1 = { ...si.hero, tilt: 57 * D, yaw: -16 * D, aperture: 0.7 }
+  // the opening looks past the hero across the board, so the drawing runs away from the lens into the board
+  const away = Math.hypot(si.hero.x - mid.x, si.hero.y - mid.y) > 0.12 * Math.min(x1 - x0, y1 - y0)
+  const wrap = (r: number): number => Math.atan2(Math.sin(r), Math.cos(r))
+  const openYaw = tilted.yaw + Math.max(-50 * D, Math.min(50 * D, wrap((away ? Math.atan2(si.hero.x - mid.x, si.hero.y - mid.y) : -24 * D) - tilted.yaw)))
+  const drawn = { x: (mid.x + si.hero.x) / 2, y: (mid.y + si.hero.y) / 2, tilt: 46 * D, yaw: openYaw + 0.6 * (tilted.yaw - openYaw), aperture: 0.16 }
+  const bench0 = { ...si.hero, tilt: 60 * D, yaw: -30 * D, aperture: 0.4 }
+  const bench1 = { ...si.hero, tilt: 54 * D, yaw: -8 * D, aperture: 0.4 }
   const wide = { ...mid, tilt: 38 * D, yaw: heroYaw, aperture: 0.05, shift }
-  const poster = { ...mid, tilt: 34 * D, yaw: -heroYaw * 0.7, aperture: 0.04, shift }
+  const poster = { ...mid, tilt: 52 * D, yaw: -heroYaw * 0.7, aperture: 0.08, shift }
   const benchZoom = Math.min(4, Math.max(1.4, macro * 0.55))
   // power-on frames the hero's half of the board; a long board is a thin strip, so closer still
   const long = Math.max(bAspect, 1 / bAspect) > 2.2
   const alive = { ...wide, x: (mid.x + si.hero.x) / 2, y: (mid.y + si.hero.y) / 2 }
   const aliveZoom = fit(wide, 1.02) * (long ? 1.6 : 1.4)
   return [
-    { t: 0, ...si.hero, zoom: macro, tilt: 0.5 * D, yaw: -4 * D, aperture: 0.02 },
-    { t: a.draw[1], ...plan, zoom: fit(plan, 1.04) },
-    { t: a.place[0] - 0.001, ...tilted, zoom: fit(tilted, 1.04) },
+    { t: 0, ...si.hero, zoom: macro * 0.8, tilt: 56 * D, yaw: openYaw, aperture: 0.45 },
+    { t: a.draw[1], ...drawn, zoom: fit(drawn, 1.04, corners(0)) * 1.2 },
+    { t: a.place[0] - 0.001, ...tilted, zoom: fit(tilted, 1.1, corners(0)) },
     { t: a.place[0], ...bench0, zoom: benchZoom, cut: true },
     { t: a.reflow[1] - 0.001, ...bench1, zoom: benchZoom * 1.12 },
     { t: a.reflow[1], ...alive, zoom: aliveZoom, cut: true },
     { t: 20 / 24 - 0.001, ...alive, yaw: heroYaw * 0.75, zoom: aliveZoom * 1.04 },
-    { t: 20 / 24, ...poster, zoom: fit(poster, 1.0) * 1.02, cut: true },
-    { t: 1, ...poster, yaw: poster.yaw * 0.85, zoom: fit(poster, 1.0) * 1.08 }
+    { t: 20 / 24, ...poster, zoom: fit(poster, 1.08) * 1.04, cut: true },
+    { t: 1, ...poster, yaw: poster.yaw * 0.85, zoom: fit(poster, 1.08) * 1.1 }
   ]
 }
 

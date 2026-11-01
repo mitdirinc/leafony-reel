@@ -116,7 +116,7 @@ uniform vec3 uCopper; uniform vec3 uFinish; uniform vec3 uMask; uniform vec3 uSu
 uniform vec3 uWarm; uniform vec3 uCool; uniform vec3 uHead;
 uniform float uFinishRough; uniform float uMaskFront; uniform float uMaskSoft; uniform float uMaskOn; uniform float uMaskLuma;
 uniform float uCured; uniform float uFinishOn; uniform float uEnergy; uniform float uPxPerMm; uniform float uBump;
-uniform float uHeat; uniform float uHeatX; uniform float uHeatW;
+uniform float uHeat; uniform float uHeatX; uniform float uHeatW; uniform float uDark; uniform vec2 uOrigin;
 ${LIGHTING}
 float hcu(vec2 uv, float lod){ return smoothstep(0.2, 0.8, textureLod(tTop, uv, lod).r); }
 vec2 gradH(float s, float lod){
@@ -143,16 +143,20 @@ void main(){
   vec3 Ncu = normalize(vec3(-g.x + grain * 0.03, g.y, 1.0));
   float weave = 0.5 + 0.5 * sin(mm.x * 11.0) * sin(mm.y * 11.0 + 1.3);
   vec3 subAlb = uSub * (0.85 + 0.25 * weave);
-  vec3 baseSub = shade(vec3(0, 0, 1), V, subAlb, 0.0, 0.6, 0.04);
+  // while the copper is drawn the laminate sits in the dark, so the drawing is the only thing to read
+  vec3 baseSub = shade(vec3(0, 0, 1), V, subAlb, 0.0, 0.6, 0.04) * (1.0 - 0.82 * uDark);
   float tone = vnoise(mm * 0.5) * 0.06;
   vec3 baseCu = shade(Ncu, V, uCopper * (0.97 + tone), 1.0, 0.3, 0.04);
   vec3 basePad = shade(Ncu, V, uFinish, 1.0, max(uFinishRough, 0.22), 0.04);
   vec3 col = mix(baseSub, baseCu, cu);
   col = mix(col, mix(baseCu, basePad, uFinishOn), pad);
-  // the mask coats the board from the far edge: a wet front, then a glossy
+  // the mask coats the board out from the hero: a wet front, then a glossy
   // coat that settles to satin. it clears every pad by a lip and follows the
   // copper relief beneath
-  float py = -vW.y + (vnoise(mm * 0.35) - 0.5) * uMaskSoft * 0.6 + sin(mm.x * 0.21) * uMaskSoft * 0.12;
+  // the coat spreads out of the hero like the routing did, a lobed liquid front
+  vec2 off = vec2(vW.x, -vW.y) - uOrigin;
+  float lobes = sin(atan(off.y, off.x) * 5.0 + length(off) * 0.004) * 0.5 + 0.5;
+  float py = length(off) + (vnoise(mm * 0.35) - 0.5) * uMaskSoft * 0.7 + lobes * uMaskSoft * 0.25;
   float padNear = textureLod(tTop, vUv, 1.4).g;
   float clearance = smoothstep(0.04, 0.22, padNear);
   float poured = smoothstep(uMaskFront, uMaskFront - uMaskSoft * 0.3, py);
@@ -185,7 +189,10 @@ void main(){
   float warm = min(mix(a.b, textureLod(tTop, vUv, lod).b * spread, scatter), cap);
   float cool = min(mix(fx.r, textureLod(tFx, vUv, lod).r * spread, scatter), cap + 0.2);
   col += uWarm * pow(warm, 1.4) * uEnergy + uCool * pow(cool, 1.4) * uEnergy * 1.15;
-  col += uHead * pow(head, 1.3) * uEnergy * (1.0 - masked);
+  // fresh copper cools like a struck wire: white at the head, then amber, then a dull red into bare metal
+  vec3 hot = mix(vec3(0.85, 0.16, 0.03), vec3(1.0, 0.55, 0.18), smoothstep(0.04, 0.3, head));
+  hot = mix(hot, uHead, smoothstep(0.32, 0.55, head));
+  col += hot * head * uEnergy * (1.0 - masked);
   float alpha = clamp(max(area * (1.0 - hole * (1.0 - pad)), max(max(cu, pad), max(warm, max(cool, head)))), 0.0, 1.0);
   o = vec4(col * alpha, alpha);
 }`
@@ -322,8 +329,9 @@ void main(){
   // a header's pins fall and sink with their housing
   float seat = int(aMeta.z + 0.5) == 12 ? aLabel.z : aMeta.y;
   float paste = max(0.0, k) * min(1.5, 0.08 * seat);
-  // from a common height, so the smallest passives fall in a visible stack instead of popping in
-  float fall = dr * max(seat * (aLabel.w > 0.5 ? 5.0 : 6.0), uFall);
+  // from a common height, so the smallest passives fall in a visible stack instead of popping in;
+  // capped, so a tall connector near the lens never sweeps the frame as a dark column
+  float fall = dr * clamp(seat * (aLabel.w > 0.5 ? 5.0 : 6.0), uFall, uFall * 1.6);
   vW = vec3(pp.x, -pp.y, fall + paste + c.z * aMeta.y);
   vec2 nn = vec2(n.x * cr - n.y * sr, n.x * sr + n.y * cr);
   vN = vec3(nn.x, -nn.y, n.z);
@@ -442,7 +450,7 @@ void main(){
   vec2 pp = aBox.xy + aSkew.xy * k + vec2(lp.x * cr - lp.y * sr, lp.x * sr + lp.y * cr);
   float scale = length(aAff.xy);
   float paste = max(0.0, k) * min(1.5, 0.08 * aMeta.y);
-  float fall = dr * max(aMeta.y * (aLabel.w > 0.5 ? 5.0 : 6.0), uFall);
+  float fall = dr * clamp(aMeta.y * (aLabel.w > 0.5 ? 5.0 : 6.0), uFall, uFall * 1.6);
   vW = vec3(pp.x, -pp.y, fall + paste + aPos.z * scale);
   vec2 n = vec2(aAff.x * aNor.x + aAff.z * aNor.y, aAff.y * aNor.x + aAff.w * aNor.y) / scale;
   n = vec2(n.x * cr - n.y * sr, n.x * sr + n.y * cr);
@@ -994,14 +1002,19 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
       const maskSpan = span(acts.mask)
       const maskOn = p >= acts.mask[0] ? 1 : 0
       const soft = 0.07 * extent.h
-      const maskFront = extent.y - soft + maskSpan * (extent.h + 2 * soft)
+      const reach = Math.max(...[[extent.x, extent.y], [extent.x + extent.w, extent.y], [extent.x, extent.y + extent.h], [extent.x + extent.w, extent.y + extent.h]]
+        .map(([x, y]) => Math.hypot((x as number) - s.origin.x, (y as number) - s.origin.y)))
+      const maskFront = -soft + maskSpan * (reach + 2 * soft)
       const maskLin = linear(m.mask)
       const maskLuma = 0.2126 * maskLin[0] + 0.7152 * maskLin[1] + 0.0722 * maskLin[2]
       const energyGain = 3.2
       // the studio dims for the held breath before power-on, so the board's own light carries the
       // climax; a dark mask has little to lose, so it dims less and comes back further for the poster
-      const dim = 0.22 + 0.3 * Math.pow(maskLuma, 1 / 2.2)
-      const room = 1 - dim * span([acts.reflow[1], acts.power[0] - 0.01]) + dim * 0.8 * span([acts.power[1] - 0.04, acts.hold[0]])
+      // lights out for the held breath: the board's own light carries power-on. the studio comes back
+      // up on the poster cut, less for a dark mask, which reads better lit by its own energy
+      const out = 0.9 - 0.12 * (1 - Math.pow(maskLuma, 1 / 2.2))
+      const room = 1 - out * span([acts.reflow[1], acts.power[0]]) + 0.06 * span([acts.power[0], 20 / 24])
+        + (out - 0.06) * 0.85 * span([20 / 24, 21.5 / 24])
       const heatSpan = (acts.reflow[1] - acts.reflow[0]) - 0.5 / 24
       const heatU = (p - acts.reflow[0]) / heatSpan
       const heat = Math.min(span([acts.reflow[0] - 0.01, acts.reflow[0] + 0.01]), 1 - span([acts.reflow[1] - 0.01, acts.reflow[1] + 0.01]))
@@ -1054,11 +1067,12 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
         tex(2, mapTex[2] as WebGLTexture)
         P.top.use().m4('uVP', c.vp).f('uRegion', ...regionV).f('uZ', 0).i('tTop', 0).i('tSurf', 1).i('tFx', 2)
           .f('uTexel', ...texel).v3('uCopper', copper).v3('uFinish', linear(m.finish)).v3('uMask', maskLin)
-          .v3('uSub', linear(m.substrate)).v3('uSilk', linear(m.silk)).v3('uWarm', warmC).v3('uCool', coolC).f('uHead', 1.25, 0.95, 0.65)
+          .v3('uSub', linear(m.substrate)).v3('uSilk', linear(m.silk)).v3('uWarm', warmC).v3('uCool', coolC).f('uHead', 1.3, 1.12, 0.92)
           .f('uFinishRough', m.finishRough).f('uMaskFront', maskFront).f('uMaskSoft', soft).f('uMaskOn', maskOn).f('uMaskLuma', Math.pow(maskLuma, 1 / 2.2))
           .f('uCured', span([acts.mask[1], acts.mask[1] + 0.04])).f('uFinishOn', span([acts.mask[1] - 0.01, acts.mask[1] + 0.02]))
           .f('uEnergy', energyGain).f('uPxPerMm', m.pxPerMm).f('uBump', 1.6)
           .f('uHeat', heat).f('uHeatX', boardX[0] + heatU * (boardX[1] - boardX[0])).f('uHeatW', 0.12 * extent.w)
+          .f('uOrigin', s.origin.x, s.origin.y).f('uDark', 1 - span([acts.draw[1] - 1 / 24, acts.mask[0] + 0.5 / 24]))
         lighting(P.top, c, p, room)
         g.drawArrays(g.TRIANGLE_STRIP, 0, 4)
         if (boxCount + roundCount + valveCount + meshDraws.length > 0) {

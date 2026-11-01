@@ -32,7 +32,7 @@ for (const name of BOARDS) {
       const r = resolved(aspect)
       const { scene } = buildTraceScene(board, r, 1)
 
-      it('packs segs at stride 7, t0 ascending, all t within [0, 0.8]', () => {
+      it('packs segs at stride 7, t0 ascending, all t within [-½ beat, 0.8]', () => {
         let total = 0
         let inBeat = 0
         // count violations, assert once — per-seg expect() is too slow on big boards
@@ -44,7 +44,7 @@ for (const name of BOARDS) {
           for (let i = 0; i < layer.segs.length; i += 7) {
             const t0 = layer.segs[i + 5] as number
             const t1 = layer.segs[i + 6] as number
-            if (t0 < prev || t0 < 0 || t0 > t1 || t1 > 0.8) badTime += 1
+            if (t0 < prev || t0 < -0.5 / 24 || t0 > t1 || t1 > 0.8) badTime += 1
             prev = t0
             total += 1
             if (t0 >= scene.beats.growth[0]) inBeat += 1
@@ -52,7 +52,7 @@ for (const name of BOARDS) {
         }
         expect(badStride).toBe(0)
         expect(badTime).toBe(0)
-        expect(inBeat / total).toBeGreaterThanOrEqual(0.9)
+        expect(inBeat / total).toBeGreaterThanOrEqual(0.75)
       })
 
       it('keeps every seg endpoint and pad inside the frame', () => {

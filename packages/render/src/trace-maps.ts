@@ -114,8 +114,12 @@ const ROLE_LOOK: Record<TraceGroup['kind'], { cool: boolean; grow: number; pulse
 /** how long the power-on wave takes to cross the board, in film phase */
 const INRUSH = 1.6 / 24
 
-/** the routing tip: a short bright streak behind each growing seg's head */
-const HEAD = { gain: 0.32, tail: 0.01 }
+/** the routing tip: white-hot at the head, cooling to bare copper along a tail of about a beat */
+const HEAD = { gain: 0.45, tail: 0.045, cool: 0.03 }
+/** an unreached pad: a dark mark in the laminate */
+const GHOST = 0.12
+/** how long a pad takes to plate once reached */
+const PLATE = 0.008
 
 function drawCopperLayer(
   ctx: CanvasRenderingContext2D,
@@ -234,7 +238,7 @@ function drawZones(ctx: CanvasRenderingContext2D, warm: Light, scene: TraceScene
     ctx.clip(clip)
     ctx.beginPath()
     ctx.arc(scene.origin.x, scene.origin.y, f * reachMax, 0, Math.PI * 2)
-    ctx.fillStyle = ink(0, 0.82)
+    ctx.fillStyle = ink(0, 0.55)
     ctx.fill()
     ctx.restore()
     // the power-on wave crosses each pour as a soft ring; a power pour keeps a low glow
@@ -291,23 +295,34 @@ export function drawMaps(maps: MapSet, tl: TraceTimeline, p: number, region: Reg
   for (const layer of s.layers) {
     if (layer.side === topSide) drawCopperLayer(top, head, warm, cool, layer, s, p)
   }
-  // pads: copper + exposed finish, there from the first frame
+  // pads: a dark mark from the first frame; each plates, with a flash of heat, when the routing reaches it
   for (const pad of s.pads) {
-    if (p < pad.t) continue
     if (pad.side === 'B' && topSide === 'F') continue
+    const k = within(p, pad.t, pad.t + PLATE)
     top.save()
     top.translate(pad.x, pad.y)
     top.rotate(pad.rot)
     padPath(top, pad.w, pad.h, pad.shape)
+    const style = k > 0 ? `rgba(255,255,0,${k.toFixed(4)})` : ink(0, GHOST)
     if (pad.ring === true) {
       top.lineWidth = 1.6
-      top.strokeStyle = 'rgba(255,255,0,1)'
+      top.strokeStyle = style
       top.stroke()
     } else {
-      top.fillStyle = 'rgba(255,255,0,1)'
+      top.fillStyle = style
       top.fill()
     }
     top.restore()
+    const flash = HEAD.gain * 0.3 * (1 - (p - pad.t) / HEAD.cool)
+    if (p >= pad.t && flash > 0) {
+      head.ctx.save()
+      head.ctx.translate(pad.x, pad.y)
+      head.ctx.rotate(pad.rot)
+      padPath(head.ctx, pad.w, pad.h, pad.shape)
+      head.ctx.fillStyle = ink(head.ch, flash)
+      head.ctx.fill()
+      head.ctx.restore()
+    }
   }
   // vias: a copper ring once the routing reaches them
   top.strokeStyle = ink(0)
