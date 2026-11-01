@@ -909,7 +909,7 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
     { t: a.reflow[1] - 0.001, ...bench1, zoom: benchZoom * 1.2 },
     // power-on looks down on the hero from near the opening's heading, the side with no tall body in the way, and pulls back as its light runs out
     { t: a.reflow[1], ...si.hero, tilt: 20 * D, yaw: powerYaw, zoom: Math.max(aliveZoom * 1.3, Math.min(macro * 0.5, benchZoom * 1.3)), aperture: 0.25, cut: true },
-    { t: 20 / 24 - 0.001, ...alive, yaw: heroYaw * 0.75, zoom: aliveZoom * 1.04 },
+    { t: 20 / 24 - 0.001, ...alive, yaw: powerYaw, tilt: 26 * D, zoom: aliveZoom * 1.04 },
     { t: 20 / 24, ...posterA, cut: true },
     { t: 1, ...posterB }
   ]
