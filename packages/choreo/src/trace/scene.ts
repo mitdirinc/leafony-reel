@@ -900,7 +900,8 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
   const drawnWhole = framed(drawn, 1.08, corners(0), 1.06)
   const drawnIn = { ...drawnWhole, x: drawnWhole.x + (si.hero.x - drawnWhole.x) * 0.3, y: drawnWhole.y + (si.hero.y - drawnWhole.y) * 0.3, zoom: drawnWhole.zoom * 1.3 }
   const whole = framed(tilted, 1.12, corners(0))
-  const leanIn = { ...whole, x: whole.x + (si.hero.x - whole.x) * 0.4, y: whole.y + (si.hero.y - whole.y) * 0.4, zoom: whole.zoom * 1.35 }
+  // and orbits 25° under the key, so the fresh coat's sheen visibly travels across the board
+  const leanIn = { ...whole, x: whole.x + (si.hero.x - whole.x) * 0.4, y: whole.y + (si.hero.y - whole.y) * 0.4, zoom: whole.zoom * 1.4, yaw: drawnIn.yaw + 25 * D * Math.sign(heroYaw || 1), tilt: 54 * D }
   // power-on frames the hero's half of the board; a long board is a thin strip, so closer still
   const long = Math.max(bAspect, 1 / bAspect) > 2.2
   const alive = { ...wide, x: (mid.x + si.hero.x) / 2, y: (mid.y + si.hero.y) / 2 }
