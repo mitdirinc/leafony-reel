@@ -336,6 +336,8 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
 
   if (p >= A.power[0]) {
     ctx.strokeStyle = red
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
     for (const layer of s.layers) {
       if (layer.side !== topSide) continue
       // one solid red stroke over the track, capped so a wide rail stays a line, not a slab
@@ -512,8 +514,9 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     if (top.length < n || bot.length < n) continue
     const lit = part.led !== undefined && part.led.at >= 0 && p >= part.led.at
     ctx.strokeStyle = part.hero === true || lit ? red : pen2
-    ctx.lineWidth = (part.hero === true ? 2.2 : 0.9) * u
-    // hidden-line boxes: opaque paper, one light pen; the far faces go down first so every near face closes the box
+    const edge = (part.hero === true ? 2.4 : 1.2) * u
+    ctx.lineWidth = (part.hero === true ? 1.1 : 0.5) * u
+    // hidden-line boxes: opaque paper, a fine pen for the creases; the far faces go down first so every near face closes the box
     if (round) fillStroke(ctx, hull([...top, ...bot]), paper)
     else {
       const faces = [0, 1, 2, 3].map((i) => {
@@ -529,6 +532,22 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
       for (const f of faces) fillStroke(ctx, f.pts, paper)
     }
     fillStroke(ctx, top, paper)
+    // the silhouette takes the heavy pen, as an illustrator would outline a part
+    ctx.lineWidth = edge
+    ctx.beginPath()
+    const sil = hull([...top, ...bot])
+    sil.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)))
+    ctx.closePath()
+    ctx.stroke()
+    if (part.kind === 'ic' && !round) {
+      const q = toScreen(v, at.x + (-0.36 * part.w) * cr - (-0.36 * part.h) * sr, at.y + (-0.36 * part.w) * sr + (-0.36 * part.h) * cr, at.lift + z)
+      if (q) {
+        ctx.beginPath()
+        ctx.arc(q[0], q[1], Math.max(1.2 * u, 0.04 * Math.min(part.w, part.h)), 0, Math.PI * 2)
+        ctx.fillStyle = ctx.strokeStyle
+        ctx.fill()
+      }
+    }
     if (part.hero === true && part.kind === 'conn' && part.pitch !== undefined && part.pitch > 0) {
       const nx = Math.max(1, Math.floor(part.w / part.pitch))
       const ny = Math.max(1, Math.floor(part.h / part.pitch))
