@@ -6,11 +6,6 @@ import { drawTitle } from './title'
 type Pt = [number, number]
 
 const clamp01 = (x: number): number => Math.min(1, Math.max(0, x))
-/** how long the red pen stays on a signal net as it passes, in film phase */
-const PASS = 0.03
-/** the hero wakes this long after power-on; its pen then takes INRUSH to cross the board (as in trace-maps) */
-const WAKE = 1 / 24
-const INRUSH = 1.75 / 24
 /** the light's direction across the plane, for the wash on body sides */
 const LIGHT = -2.2
 const mixHex = (a: string, b: string, t: number): string => {
@@ -149,6 +144,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
   const ink = pal.silk
   const pen2 = pal.copperDim
   const red = pal.head
+  const faint = mixHex(paper, ink, 0.3)
   const A = s.acts
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   if (tl.transparent) ctx.clearRect(0, 0, W, H)
@@ -227,41 +223,19 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
 
   const planScale = localAffine(ctx, v, s.origin.x, s.origin.y)
   ctx.setTransform(1, 0, 0, 1, 0, 0)
-  const step = (9 * u) / Math.max(1e-3, planScale)
+  // pours are drawn by their edge only: the field stays quiet so the hero's lines can carry the drawing
   for (const zone of s.zones) {
     const frac = ease((p - zone.t0) / Math.max(1e-6, zone.t1 - zone.t0))
     if (frac <= 0) continue
     const live = zone.e0 >= 0 && p >= zone.e0
-    let x0 = Infinity
-    let y0 = Infinity
-    let x1 = -Infinity
-    let y1 = -Infinity
-    for (let i = 0; i + 1 < zone.fill.length; i += 2) {
-      x0 = Math.min(x0, zone.fill[i] as number)
-      x1 = Math.max(x1, zone.fill[i] as number)
-      y0 = Math.min(y0, zone.fill[i + 1] as number)
-      y1 = Math.max(y1, zone.fill[i + 1] as number)
-    }
-    ctx.save()
-    polyPath(ctx, v, zone.fill)
-    ctx.clip()
-    ctx.strokeStyle = live ? red : pen2
-    ctx.globalAlpha = live ? 0.3 * ease((p - zone.e0) / 0.04) + (1 - ease((p - zone.e0) / 0.04)) * (zone.side === 'F' ? 0.5 : 0.25) : zone.side === 'F' ? 0.5 : 0.25
+    ctx.strokeStyle = live ? red : faint
+    ctx.globalAlpha = frac * (zone.side === 'F' ? 1 : 0.5)
     ctx.lineWidth = 0.7 * u
-    ctx.beginPath()
-    const span = x1 - x0 + (y1 - y0)
-    for (let c = x0 + y0; c <= x0 + y0 + span * frac; c += step * Math.SQRT2) {
-      const a = toScreen(v, c - y0, y0)
-      const b = toScreen(v, c - y1, y1)
-      if (a && b) {
-        ctx.moveTo(a[0], a[1])
-        ctx.lineTo(b[0], b[1])
-      }
-    }
+    polyPath(ctx, v, zone.fill)
     ctx.stroke()
-    ctx.restore()
     drawn += 1
   }
+  ctx.globalAlpha = 1
 
   const topSide = s.layers.some((l) => l.side === 'F') ? 'F' : (s.layers[s.layers.length - 1]?.side ?? 'F')
   const hair = 1.05 * u
@@ -270,6 +244,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     const segs = layer.segs
     const wide = new Map<number, Path2D>()
     const thin = new Path2D()
+    const quiet = new Path2D()
     for (let i = 0; i + 6 < segs.length; i += 7) {
       const t0 = segs[i + 5] as number
       if (t0 > p) break
@@ -281,8 +256,9 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
       const b = toScreen(v, ax + ((segs[i + 2] as number) - ax) * k, ay + ((segs[i + 3] as number) - ay) * k)
       if (!a || !b) continue
       const w = (segs[i + 4] as number) * planScale
+      const live = front && (s.groups[layer.groups[i / 7] as number]?.t ?? -1) >= 0
       if (front && w > 3.2 * u) {
-        const key = Math.round(w * 2) / 2
+        const key = (live ? 1 : -1) * Math.round(w * 2) / 2
         let path = wide.get(key)
         if (path === undefined) {
           path = new Path2D()
@@ -291,23 +267,27 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
         path.moveTo(a[0], a[1])
         path.lineTo(b[0], b[1])
       } else {
-        thin.moveTo(a[0], a[1])
-        thin.lineTo(b[0], b[1])
+        const path = live ? thin : quiet
+        path.moveTo(a[0], a[1])
+        path.lineTo(b[0], b[1])
       }
       drawn += 1
     }
     ctx.globalAlpha = front ? 1 : 0.45
-    ctx.strokeStyle = front ? ink : pen2
+    ctx.strokeStyle = front ? faint : pen2
     ctx.lineWidth = front ? hair : 0.7 * u
+    ctx.stroke(quiet)
+    ctx.strokeStyle = ink
+    ctx.lineWidth = hair
     ctx.stroke(thin)
-    for (const [w, path] of wide) {
-      ctx.strokeStyle = ink
-      ctx.lineWidth = w
+    for (const [key, path] of wide) {
+      ctx.strokeStyle = key > 0 ? ink : faint
+      ctx.lineWidth = Math.abs(key)
       ctx.stroke(path)
     }
-    for (const [w, path] of wide) {
+    for (const [key, path] of wide) {
       ctx.strokeStyle = paper
-      ctx.lineWidth = Math.max(0, w - 2 * hair)
+      ctx.lineWidth = Math.max(0, Math.abs(key) - 2 * hair)
       ctx.stroke(path)
     }
   }
@@ -326,7 +306,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     else if (pad.shape === 'round') ctx.roundRect(-pad.w / 2, -pad.h / 2, pad.w, pad.h, Math.min(pad.w, pad.h) * 0.32)
     else ctx.rect(-pad.w / 2, -pad.h / 2, pad.w, pad.h)
     ctx.lineWidth = hair / k
-    ctx.strokeStyle = back ? pen2 : ink
+    ctx.strokeStyle = back ? pen2 : faint
     ctx.globalAlpha = back ? 0.5 : 1
     if (!back) {
       ctx.fillStyle = paper
@@ -341,7 +321,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     const k = localAffine(ctx, v, via.x, via.y)
     if (k === 0) continue
     ctx.lineWidth = hair / k
-    ctx.strokeStyle = ink
+    ctx.strokeStyle = faint
     ctx.fillStyle = paper
     ctx.beginPath()
     ctx.arc(via.x, via.y, via.r, 0, Math.PI * 2)
@@ -354,39 +334,9 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0)
 
-  // a beat after power-on the hero wakes, and the red pen runs out across every trace in the order it was drawn
-  const w0 = A.power[0] + WAKE
-  if (p >= w0 && p < w0 + INRUSH + PASS) {
-    const wave = INRUSH / Math.max(1e-6, A.draw[1] - A.draw[0])
-    ctx.strokeStyle = red
-    ctx.lineWidth = 1.3 * u
-    for (const layer of s.layers) {
-      if (layer.side !== topSide) continue
-      const path = new Path2D()
-      for (let j = 0; j * 7 + 6 < layer.segs.length; j++) {
-        const o = j * 7
-        const a0 = w0 + ((layer.segs[o + 5] as number) - A.draw[0]) * wave
-        if (a0 > p) break
-        const span = Math.max(1e-6, ((layer.segs[o + 6] as number) - (layer.segs[o + 5] as number)) * wave)
-        const k = clamp01((p - a0) / span)
-        const k0 = clamp01((p - PASS - a0) / span)
-        if (k0 >= k) continue
-        const ax = layer.segs[o] as number
-        const ay = layer.segs[o + 1] as number
-        const dx = (layer.segs[o + 2] as number) - ax
-        const dy = (layer.segs[o + 3] as number) - ay
-        const a = toScreen(v, ax + dx * k0, ay + dy * k0)
-        const b = toScreen(v, ax + dx * k, ay + dy * k)
-        if (!a || !b) continue
-        path.moveTo(a[0], a[1])
-        path.lineTo(b[0], b[1])
-      }
-      ctx.stroke(path)
-    }
-  }
   if (p >= A.power[0]) {
     ctx.strokeStyle = red
-    ctx.lineWidth = 1.6 * u
+    ctx.lineWidth = 2 * u
     for (const layer of s.layers) {
       if (layer.side !== topSide) continue
       const path = new Path2D()
@@ -394,18 +344,14 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
         const e0 = layer.energy[j * 2] as number
         const e1 = layer.energy[j * 2 + 1] as number
         if (e0 < 0 || p < e0) continue
-        // the rails keep their red; every other net carries the pen past and returns to ink
-        const rail = s.groups[layer.groups[j] as number]?.kind === 'power'
-        const span = Math.max(1e-6, e1 - e0)
-        const k = clamp01((p - e0) / span)
-        const k0 = rail ? 0 : clamp01((p - PASS - e0) / span)
-        if (k0 >= k) continue
+        // the live lines keep their red through the hold: one route from the rails into the hero and out of it
+        const k = clamp01((p - e0) / Math.max(1e-6, e1 - e0))
         const o = j * 7
         const ax = layer.segs[o] as number
         const ay = layer.segs[o + 1] as number
         const dx = (layer.segs[o + 2] as number) - ax
         const dy = (layer.segs[o + 3] as number) - ay
-        const a = toScreen(v, ax + dx * k0, ay + dy * k0)
+        const a = toScreen(v, ax, ay)
         const b = toScreen(v, ax + dx * k, ay + dy * k)
         if (!a || !b) continue
         path.moveTo(a[0], a[1])
@@ -416,7 +362,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     }
   }
 
-  ctx.strokeStyle = ink
+  ctx.strokeStyle = pen2
   ctx.globalAlpha = 0.8
   ctx.lineWidth = 0.8 * u
   for (const stroke of s.silkStrokes) {
@@ -427,7 +373,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     ctx.stroke()
     drawn += 1
   }
-  ctx.fillStyle = ink
+  ctx.fillStyle = pen2
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   for (const text of s.texts) {
@@ -446,7 +392,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
   ctx.globalAlpha = 1
 
   const dimFrac = ease((p - A.mask[0]) / Math.max(1e-6, A.mask[1] - A.mask[0]))
-  const dimFade = 1 - ease((p - A.silk[0]) / Math.max(1e-6, A.silk[1] - A.silk[0]))
+  const dimFade = 1 - ease((p - A.silk[0]) / (A.place[0] - A.silk[0]))
   if (dimFrac > 0 && dimFade > 0) {
     let bx0 = Infinity
     let by0 = Infinity
@@ -532,7 +478,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     bodies.push({ part, at, d })
   }
   bodies.sort((a, b) => b.d - a.d)
-  const side = [0.05, 0.11, 0.2].map((t) => mixHex(paper, ink, t))
+  const side = [0.03, 0.07, 0.12].map((t) => mixHex(paper, ink, t))
   for (const { part, at } of bodies) {
     const cr = Math.cos(at.rot)
     const sr = Math.sin(at.rot)
@@ -553,8 +499,10 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     const bot = ring(0, n, round)
     if (top.length < n || bot.length < n) continue
     const lit = part.led !== undefined && part.led.at >= 0 && p >= part.led.at
-    ctx.strokeStyle = part.hero === true || lit ? red : ink
-    ctx.lineWidth = (part.hero === true ? 1.6 : 1) * u
+    ctx.strokeStyle = part.hero === true || lit ? red : pen2
+    ctx.lineWidth = (part.hero === true ? 2.2 : 0.9) * u
+    // every body but the hero is a ghost: thin paper over the drawing, so housings never outweigh the subject
+    ctx.globalAlpha = part.hero === true ? 1 : 0.6
     // sides take a light wash by how they face the light, so a body reads as a solid, not a hole in the drawing
     if (round) fillStroke(ctx, hull([...top, ...bot]), side[1] as string)
     else {
@@ -566,6 +514,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
       }
     }
     fillStroke(ctx, top, paper)
+    ctx.globalAlpha = 1
     if (part.kind === 'conn' && part.pitch !== undefined && part.pitch > 0) {
       const nx = Math.max(1, Math.floor(part.w / part.pitch))
       const ny = Math.max(1, Math.floor(part.h / part.pitch))
