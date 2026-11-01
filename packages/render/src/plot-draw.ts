@@ -282,12 +282,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     ctx.stroke(thin)
     for (const [w, path] of wide) {
       ctx.strokeStyle = ink
-      ctx.lineWidth = w
-      ctx.stroke(path)
-    }
-    for (const [w, path] of wide) {
-      ctx.strokeStyle = paper
-      ctx.lineWidth = Math.max(0, w - 2 * hair)
+      ctx.lineWidth = Math.min(w, 2.6 * u)
       ctx.stroke(path)
     }
   }
@@ -567,7 +562,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
       ctx.fillStyle = ink
       ctx.fill()
     }
-    if (part.label !== undefined) {
+    if (part.label !== undefined && part.hero === true) {
       const k = localAffine(ctx, v, at.x, at.y, at.lift + z)
       if (k > 0) {
         ctx.translate(at.x, at.y)
@@ -575,8 +570,8 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
         upright(ctx)
         const len = Math.max(part.w, part.h)
         const size = Math.min(Math.min(part.w, part.h) * 0.2, (len * 0.8) / Math.max(4, part.label.length * 0.62))
-        ctx.font = `${part.hero === true ? '600 ' : ''}${size}px ${FONT}`
-        ctx.fillStyle = part.hero === true ? red : pen2
+        ctx.font = `600 ${size}px ${FONT}`
+        ctx.fillStyle = red
         ctx.fillText(part.label, 0, 0)
       }
       ctx.setTransform(1, 0, 0, 1, 0, 0)

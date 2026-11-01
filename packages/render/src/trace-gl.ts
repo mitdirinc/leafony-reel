@@ -1268,13 +1268,18 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
   }
 }
 
-/** the captions showing at phase p, faded in and out, pinned to the top of the part they name */
+/** the captions showing at phase p, faded in and out, pinned to the top corner of the part they name, clear of its marking */
 function annotate(tl: TraceTimeline, p: number, cam: Cam, W: number, H: number): Annotation[] {
-  const top = Math.max(0, ...tl.scene.parts.filter((pt) => pt.hero === true).map((pt) => pt.z))
+  const hero = tl.scene.parts.find((pt) => pt.hero === true)
+  const top = hero?.z ?? 0
   return tl.scene.callouts
     .filter((c) => p >= c.t0 && p <= c.t1)
     .map((c) => {
-      const q = project(cam, c.x, c.y, top)
+      const corners = hero === undefined ? [[0, 0]] : [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => [
+        ((sx as number) * hero.w / 2) * Math.cos(hero.rot) - ((sy as number) * hero.h / 2) * Math.sin(hero.rot),
+        ((sx as number) * hero.w / 2) * Math.sin(hero.rot) + ((sy as number) * hero.h / 2) * Math.cos(hero.rot)
+      ])
+      const q = corners.map(([dx, dy]) => project(cam, c.x + (dx as number), c.y + (dy as number), top)).reduce((a, b) => (b.y > a.y ? b : a))
       const mid = project(makeCam(sampleShot(tl.scene.shots, (c.t0 + c.t1) / 2), W, H), c.x, c.y, top)
       return {
         side: mid.x < 0 ? -1 as const : 1 as const,

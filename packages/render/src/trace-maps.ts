@@ -104,10 +104,10 @@ function streak(
 const ROLE_LOOK: Record<TraceGroup['kind'], { cool: boolean; grow: number; tail: number; steady: number }> = {
   power: { cool: false, grow: 0.6, tail: 0.04, steady: 0.2 },
   ground: { cool: false, grow: 0, tail: 0.01, steady: 0 },
-  clock: { cool: true, grow: 1.2, tail: 0.04, steady: 0.12 },
-  bus: { cool: true, grow: 1.1, tail: 0.04, steady: 0.12 },
-  diff: { cool: true, grow: 1.1, tail: 0.04, steady: 0.12 },
-  signal: { cool: true, grow: 1.0, tail: 0.04, steady: 0.12 }
+  clock: { cool: true, grow: 1.2, tail: 0.04, steady: 0.22 },
+  bus: { cool: true, grow: 1.1, tail: 0.04, steady: 0.22 },
+  diff: { cool: true, grow: 1.1, tail: 0.04, steady: 0.22 },
+  signal: { cool: true, grow: 1.0, tail: 0.04, steady: 0.22 }
 }
 
 /** the hero wakes this long after power-on, once the rails have reached it */
@@ -318,7 +318,7 @@ export function drawMaps(maps: MapSet, tl: TraceTimeline, p: number, region: Reg
   // power-on peaks on the hero: its pins burn past the bloom threshold for two beats, then settle to an ember for the poster;
   // grown past the pad so a leadless package's pins still show beside its body
   const since = (p - wake) * 24
-  const flare = since < 0 ? 0 : Math.min(1, since / 0.3) * (0.05 + 0.95 * Math.exp(-Math.max(0, since - 2) / 1.0))
+  const flare = since < 0 ? 0 : Math.min(1, since / 0.3) * (0.12 + 0.88 * Math.exp(-Math.max(0, since - 2) / 1.0))
   if (flare > 0.01) {
     fx.fillStyle = ink(2, flare)
     for (const pad of s.pads) {
