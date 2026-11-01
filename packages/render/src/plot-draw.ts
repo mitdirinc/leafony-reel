@@ -552,7 +552,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     const top = ring(part.z, n, round)
     const bot = ring(0, n, round)
     if (top.length < n || bot.length < n) continue
-    const lit = part.led !== undefined && p >= A.power[0] + 0.02
+    const lit = part.led !== undefined && part.led.at >= 0 && p >= part.led.at
     ctx.strokeStyle = part.hero === true || lit ? red : ink
     ctx.lineWidth = (part.hero === true ? 1.6 : 1) * u
     // sides take a light wash by how they face the light, so a body reads as a solid, not a hole in the drawing

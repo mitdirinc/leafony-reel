@@ -36,7 +36,7 @@ function kindOf(ref: string, value: string | undefined, nPads: number, tht: bool
   const v = (value ?? '').toUpperCase()
   if (/^(U|IC)\d/.test(r) || (/^Q\d/.test(r) && nPads >= 3)) return 'ic'
   if (/^(Y|X|XTAL|OSC)\d/.test(r) || /MHZ|XTAL|CRYSTAL/.test(v)) return 'xtal'
-  if (/^(LED|D)\d/.test(r) && /LED|WS28|SK68|APA10/.test(v + r)) return 'led'
+  if (/^(LED|D)\d/.test(r) && (/LED|WS28|SK68|APA10/.test(v + r) || /^(RED|GRN|GREEN|BLU|BLUE|WHT|WHITE|ORA|ORANGE|AMBER|YEL|YELLOW|PNK|PINK)$/.test(v))) return 'led'
   if (/^D\d/.test(r)) return 'diode'
   if (/^(J|P|CN|CON|USB|X)\d/.test(r)) return 'conn'
   if (/^(SW|S|BTN|K)\d/.test(r)) return 'switch'

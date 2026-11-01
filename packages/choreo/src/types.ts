@@ -190,15 +190,12 @@ export interface TraceLayer {
 
 /**
  * One casting unit of the score (a bus, a pair, a clock, a lone net). Its
- * segs grow at one speed through [t, t + d]; pulses replay that growth front
- * at `pulseSpeed`× speed starting at each time in `pulses`.
+ * segs light at one speed through [t, t + d].
  */
 export interface TraceGroup {
   kind: 'ground' | 'power' | 'clock' | 'diff' | 'bus' | 'signal'
   t: number
   d: number
-  pulses: number[]
-  pulseSpeed: number
 }
 
 /** the board's physical build, resolved to colours */
@@ -274,8 +271,8 @@ export interface TracePart {
   pitch?: number | undefined
   /** a header pin: the height of the housing it stands in, px; it falls with the housing */
   seat?: number | undefined
-  /** an LED's light at power-on: its colour, and a gain that drops where LEDs crowd */
-  led?: { color: string; gain: number } | undefined
+  /** an LED's light: its colour, a gain that drops where LEDs crowd, and the phase it switches on (−1: it stays dark) */
+  led?: { color: string; gain: number; at: number } | undefined
   /** the part's real body: an index into scene.meshes, drawn through m (local mm → px: x = m0·u + m2·v + m4, y = m1·u + m3·v + m5) */
   mesh?: { id: number; m: [number, number, number, number, number, number] } | undefined
 }

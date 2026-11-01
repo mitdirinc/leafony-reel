@@ -36,7 +36,7 @@ describe('the trace score', () => {
       }
     })
 
-    it(`${name}: no light before power-on; pulses ride after their unit has lit`, () => {
+    it(`${name}: no light before power-on; ground stays dark`, () => {
       for (const layer of s.layers) {
         for (let i = 0; i < layer.energy.length; i += 2) {
           const e0 = layer.energy[i] as number
@@ -47,10 +47,6 @@ describe('the trace score', () => {
       }
       for (const g of s.groups) {
         if (g.kind === 'ground') expect(g.t).toBe(-1)
-        for (const p of g.pulses) {
-          expect(p).toBeGreaterThan(g.t + g.d)
-          expect(p).toBeLessThan(1)
-        }
       }
     })
 

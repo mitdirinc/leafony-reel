@@ -47,13 +47,13 @@ const TRACE_BEATS: TraceBeats = {
   hold: [20 * B, 1]
 }
 
-/** when each role's energy first crosses it after power-on; ground stays dark */
+/** when each role's energy first crosses it after power-on: the rails, then the hero's own lines once it wakes; ground stays dark */
 const ROLE_TIME: Record<NetKind, { start: [number, number]; d: [number, number] } | undefined> = {
   power: { start: [16 * B, 16.5 * B], d: [1 * B, 1.5 * B] },
-  clock: { start: [17 * B, 17 * B], d: [0.5 * B, 0.5 * B] },
-  bus: { start: [18 * B, 19 * B], d: [1 * B, 1.5 * B] },
-  diff: { start: [18 * B, 19.5 * B], d: [0.75 * B, 1 * B] },
-  signal: { start: [18.5 * B, 21 * B], d: [0.75 * B, 1.5 * B] },
+  clock: { start: [17 * B, 17 * B], d: [0.75 * B, 0.75 * B] },
+  bus: { start: [17 * B, 17.5 * B], d: [1 * B, 1.5 * B] },
+  diff: { start: [17 * B, 17.5 * B], d: [1 * B, 1.5 * B] },
+  signal: { start: [17 * B, 17.5 * B], d: [1 * B, 1.5 * B] },
   ground: undefined
 }
 
@@ -194,7 +194,11 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
   const entry = powerEntry(board, isPower)
   const gIn = entry.length > 0 ? growthSchedule(segs, links, entry, entry[0]?.pos ?? originMm) : g
   const eStart = segGroup.map((gi, i) => (netGroups[gi]?.kind === 'power' ? gIn.start[i] : g.start[i]) as number)
-  const sched = scheduleEnergy(netGroups.map((ng) => ng.kind), segLen, segNet, segGroup, eStart, md, seed)
+    const heroGroups = new Set<number>()
+  for (const copper of Object.values(board.copper)) {
+    for (const pad of copper.pads) if (pad.footprintRef === hero?.ref && pad.netId !== undefined) heroGroups.add(groupOf.get(pad.netId) ?? -1)
+  }
+  const sched = scheduleEnergy(netGroups.map((ng) => ng.kind), segLen, segNet, segGroup, eStart, md, heroGroups)
 
   // the routing: a wavefront out of the hero's pins, in even work per beat
   const [d0, d1] = acts.draw
@@ -431,6 +435,7 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
   const [rf0, rf1] = acts.reflow
   const prng = makeRng(seed, 'trace-paste')
   const leds = partsMm.filter((pt) => pt.kind === 'led')
+  const pilots = pilotLeds(board, isPower)
   const footprintOf = new Map(board.footprints.map((fp) => [fp.ref, fp]))
   const meshes: PartMesh[] = []
   const meshIds = new Map<number, number>()
@@ -475,7 +480,7 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
       skew: pt.pins === undefined ? skew : [0, 0, 0],
       label,
       pitch: pt.kind === 'conn' && pt.pitch > 0 ? pt.pitch * fit.scale : undefined,
-      led: pt.kind === 'led' ? ledLight(pt, leds) : undefined,
+      led: pt.kind === 'led' ? { ...ledLight(pt, leds), at: pilots.has(pt.ref) ? acts.power[0] : -1 } : undefined,
       hero: isHero,
       mesh: solid
     }
@@ -533,12 +538,12 @@ interface Schedule {
 }
 
 /**
- * First power-on, by role. Each casting unit gets one start and duration
- * from its role's window, ordered outward from the hero. Inside a unit every
- * net is normalised to that window, so a bus's members leave together and
- * arrive together however long each runs: length-matched lines land on the
- * same frame, which is what the designer built them for. Ground stays dark,
- * and only some lone signals carry light, so the board never glitters.
+ * First power-on, by role. The rails light out of the power connector; once
+ * the hero wakes, only its own lines carry light, each casting unit once,
+ * ordered outward from the hero. Inside a unit every net is normalised to
+ * that window, so a bus's members leave together and arrive together however
+ * long each runs: length-matched lines land on the same frame, which is what
+ * the designer built them for. Ground stays dark.
  */
 function scheduleEnergy(
   kinds: NetKind[],
@@ -547,7 +552,7 @@ function scheduleEnergy(
   segGroup: number[],
   start: number[],
   md: number,
-  seed: number
+  heroGroups: Set<number>
 ): Schedule {
   const netMin = new Map<number, number>()
   const netMax = new Map<number, number>()
@@ -566,42 +571,21 @@ function scheduleEnergy(
     gSegs[gi] = (gSegs[gi] as number) + 1
   })
 
-  const rng = makeRng(seed, 'trace-pulses')
-  const groups: TraceGroup[] = kinds.map((kind) => ({ kind, t: -1, d: 0, pulses: [], pulseSpeed: 1 }))
+  const groups: TraceGroup[] = kinds.map((kind) => ({ kind, t: -1, d: 0 }))
   const snap = (t: number, q: number): number => Math.round(t / q) * q
   for (const kind of Object.keys(ROLE_TIME) as NetKind[]) {
     const role = ROLE_TIME[kind]
     if (role === undefined) continue
-    const mine = [...kinds.keys()].filter((i) => kinds[i] === kind && (gSegs[i] as number) > 0)
+    const mine = [...kinds.keys()].filter((i) => kinds[i] === kind && (gSegs[i] as number) > 0 && (kind === 'power' || heroGroups.has(i)))
       .sort((a, b) => (gMin[a] as number) - (gMin[b] as number))
     const { start: [s0, s1], d: [d0, d1] } = role
-    // a busy board lights a third of its lone signals; a small one lights them all
-    const share = kind === 'signal' ? Math.min(1, Math.max(0.3, 40 / Math.max(1, mine.length))) : 1
     mine.forEach((gi, r) => {
-      if (rng.next() > share) return
       const u = 0.6 * (mine.length > 1 ? r / (mine.length - 1) : 0) + 0.4 * Math.min(1, (gMin[gi] as number) / md)
       const span = (gMax[gi] as number) - (gMin[gi] as number)
       const d = d0 + (d1 - d0) * Math.min(1, span / (0.6 * md))
-      const t = Math.min(snap(s0 + u * (s1 - s0), B / 2), TRACE_ACTS.power[1] - d)
       const grp = groups[gi] as TraceGroup
-      grp.t = t
+      grp.t = Math.min(snap(s0 + u * (s1 - s0), B / 2), TRACE_ACTS.power[1] - d)
       grp.d = d
-      const done = t + d
-      if (kind === 'clock') {
-        grp.pulseSpeed = 2
-        for (let p = snap(done + B / 2, B); p < 1 - B; p += B) grp.pulses.push(p)
-      } else if (kind === 'bus') {
-        // every bus fires on the same beats: the board breathes in time
-        grp.pulseSpeed = 1.4
-        for (const p of [19, 20, 21, 22, 23].map((b) => b * B)) if (p > done + B / 2) grp.pulses.push(p)
-      } else if (kind === 'diff') {
-        grp.pulseSpeed = 1.5
-        for (let p = snap(done + B, B); p < 1 - B; p += 2 * B) grp.pulses.push(p)
-      } else if (kind === 'signal' && share > 0.6) {
-        grp.pulseSpeed = 1.2
-        const p = snap(rng.range(Math.max(done + B, 19 * B), 23 * B), B / 2)
-        if (p > done + B / 2 && p < 1 - B) grp.pulses.push(p)
-      }
     })
   }
 
@@ -705,9 +689,9 @@ function material(board: BoardModel, resolved: ResolvedConfig, pxPerMm: number):
     finishRough: finish?.rough ?? 0.24,
     substrate: trueColour ? '#2b2617' : mixHex(palette.bg, palette.copperDim, 0.3),
     silk,
-    energyWarm: trueColour ? '#ffc98a' : palette.head,
+    energyWarm: trueColour ? '#ffa860' : palette.head,
     // one colour temperature: data runs as a paler shade of the same warm light
-    energyCool: trueColour ? '#ffe9cc' : mixHex(palette.head, palette.silk, 0.5),
+    energyCool: trueColour ? '#ffcf9c' : mixHex(palette.head, palette.silk, 0.5),
     pxPerMm,
     thicknessPx: board.stackup.thickness * pxPerMm
   }
@@ -730,9 +714,34 @@ const LED_COLOURS: Array<[RegExp, string]> = [
   [/GREEN|GRN/, '#2cff5a'],
   [/BLUE|BLU/, '#2f6bff'],
   [/YELLOW|YEL/, '#ffd22a'],
-  [/AMBER|ORANGE/, '#ff8c1a'],
+  [/AMBER|ORANGE|ORA/, '#ff8c1a'],
+  [/PINK|PNK/, '#ff4f9a'],
   [/WHITE|WHT|WS28|SK68|APA10|RGB/, '#fff1e2']
 ]
+
+/** power indicators: LEDs to ground, fed through one resistor straight off a rail. They light the moment power arrives */
+function pilotLeds(board: BoardModel, isPower: (net: number | undefined) => boolean): Set<string> {
+  const nets = new Map<string, Set<number>>()
+  for (const copper of Object.values(board.copper)) {
+    for (const pad of copper.pads) {
+      if (pad.footprintRef === undefined || pad.netId === undefined) continue
+      const set = nets.get(pad.footprintRef) ?? new Set<number>()
+      set.add(pad.netId)
+      nets.set(pad.footprintRef, set)
+    }
+  }
+  const fed = new Set<number>()
+  for (const [ref, set] of nets) {
+    if (!/^R\d/.test(ref) || set.size !== 2) continue
+    const [a, b] = [...set] as [number, number]
+    if (isPower(a)) fed.add(b)
+    if (isPower(b)) fed.add(a)
+  }
+  const ground = new Set(board.nets.filter((n) => /GND|VSS/i.test(n.name)).map((n) => n.id))
+  const out = new Set<string>()
+  for (const [ref, set] of nets) if (/^(LED|D)\d/.test(ref) && [...set].some((n) => ground.has(n)) && [...set].some((n) => fed.has(n))) out.add(ref)
+  return out
+}
 
 /** an LED lights in the colour its value names; a crowd of LEDs shares its light, so a matrix stays a grid of points */
 function ledLight(led: PartMm, leds: PartMm[]): { color: string; gain: number } {

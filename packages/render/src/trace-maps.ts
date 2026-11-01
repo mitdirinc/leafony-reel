@@ -99,16 +99,15 @@ function streak(
 
 /**
  * How each role reads once the board is powered: the rails are warm and stay
- * lit, clocks are short sharp cool ticks, buses and pairs are long cool
- * streaks, a lone signal is a dim one.
+ * lit; the hero's own lines carry one cool streak out of it and go quiet.
  */
-const ROLE_LOOK: Record<TraceGroup['kind'], { cool: boolean; grow: number; pulse: number; tail: number; steady: number }> = {
-  power: { cool: false, grow: 1.2, pulse: 0, tail: 0.06, steady: 0.4 },
-  ground: { cool: false, grow: 0, pulse: 0, tail: 0.01, steady: 0 },
-  clock: { cool: true, grow: 0.9, pulse: 0.75, tail: 0.006, steady: 0 },
-  bus: { cool: true, grow: 0.7, pulse: 0.42, tail: 0.02, steady: 0 },
-  diff: { cool: true, grow: 0.7, pulse: 0.5, tail: 0.014, steady: 0 },
-  signal: { cool: true, grow: 0.4, pulse: 0.3, tail: 0.012, steady: 0 }
+const ROLE_LOOK: Record<TraceGroup['kind'], { cool: boolean; grow: number; tail: number; steady: number }> = {
+  power: { cool: false, grow: 1.2, tail: 0.06, steady: 0.4 },
+  ground: { cool: false, grow: 0, tail: 0.01, steady: 0 },
+  clock: { cool: true, grow: 0.9, tail: 0.03, steady: 0 },
+  bus: { cool: true, grow: 0.8, tail: 0.03, steady: 0 },
+  diff: { cool: true, grow: 0.8, tail: 0.03, steady: 0 },
+  signal: { cool: true, grow: 0.6, tail: 0.03, steady: 0 }
 }
 
 /** the hero wakes this long after power-on, once the rails have reached it */
@@ -185,20 +184,12 @@ function drawCopperLayer(
     const light = look.cool ? cool : warm
     streak(light, x0, y0, x1, y1, w, e0, e1, p, look.grow, look.tail)
     if (look.steady > 0 && p > e1) {
-      light.ctx.strokeStyle = ink(light.ch, look.steady * within(p, e1, e1 + 0.02))
-      light.ctx.lineWidth = w * 1.5
+      light.ctx.strokeStyle = ink(light.ch, look.steady * Math.min(1, 3 / w) * within(p, e1, e1 + 0.02))
+      light.ctx.lineWidth = Math.min(w * 1.5, w + 2)
       light.ctx.beginPath()
       light.ctx.moveTo(x0, y0)
       light.ctx.lineTo(x1, y1)
       light.ctx.stroke()
-    }
-    // pulses replay the power-on front faster, on the beat
-    const k = 1 / grp.pulseSpeed
-    for (const s of grp.pulses) {
-      const w0 = s + (e0 - grp.t) * k
-      const w1 = s + (e1 - grp.t) * k
-      if (p < w0 || p > w1 + look.tail) continue
-      streak(light, x0, y0, x1, y1, w, w0, w1, p, look.pulse, look.tail)
     }
   }
 }
@@ -282,16 +273,20 @@ export function drawMaps(maps: MapSet, tl: TraceTimeline, p: number, region: Reg
   // the hero wakes as the rails reach it: light leaks out from under its body, then settles to a glow
   const wake = s.acts.power[0] + WAKE
   if (p >= wake) {
-    const k = 0.22 + 0.5 * Math.max(0, 1 - (p - wake) / 0.04)
+    const k = 0.38 + 0.4 * Math.max(0, 1 - (p - wake) / 0.04)
     for (const part of s.parts) {
       if (part.hero !== true) continue
       top.save()
       top.translate(part.x, part.y)
       top.rotate(part.rot)
-      const rim = 0.06 * Math.min(part.w, part.h)
-      for (const [grow, a] of [[1, 0.3], [0.5, 0.6], [0.15, 1]] as const) {
+      const rim = 0.11 * Math.min(part.w, part.h)
+      for (const [grow, a] of [[1, 0.35], [0.55, 0.6], [0.2, 1]] as const) {
+        const r = rim * grow
         top.fillStyle = ink(2, k * a)
-        top.fillRect(-part.w / 2 - rim * grow, -part.h / 2 - rim * grow, part.w + 2 * rim * grow, part.h + 2 * rim * grow)
+        top.beginPath()
+        top.rect(-part.w / 2 - r, -part.h / 2 - r, part.w + 2 * r, part.h + 2 * r)
+        top.rect(-part.w / 2 + rim * 0.1, -part.h / 2 + rim * 0.1, part.w - rim * 0.2, part.h - rim * 0.2)
+        top.fill('evenodd')
       }
       top.restore()
     }

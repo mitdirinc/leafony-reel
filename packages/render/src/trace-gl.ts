@@ -209,12 +209,12 @@ const FS_FLOOR = `#version 300 es
 precision highp float;
 in vec2 vUv; in vec3 vW; out vec4 o;
 uniform sampler2D tSurf; uniform sampler2D tTop; uniform sampler2D tFx; uniform vec4 uMap;
-uniform vec2 uCentre; uniform float uSpread; uniform vec3 uWarm; uniform vec3 uCool; uniform vec3 uKeyDir;
+uniform vec2 uCentre; uniform float uSpread; uniform float uPool; uniform vec3 uWarm; uniform vec3 uCool; uniform vec3 uKeyDir;
 void main(){
   vec2 p = vec2(vW.x, -vW.y);
   float d = length(p - uCentre);
   // a pool of studio light falling off into black
-  vec3 col = vec3(0.016, 0.018, 0.022) * exp(-d * d / (2.0 * uSpread * uSpread)) + vec3(0.0015);
+  vec3 col = vec3(0.016, 0.018, 0.022) * uPool * exp(-d * d / (2.0 * uSpread * uSpread)) + vec3(0.0015);
   vec2 uv = (p - uMap.xy) / uMap.zw;
   vec2 suv = uv + uKeyDir.xy * vec2(1.0, -1.0) * 0.006;
   if (suv.x > 0.0 && suv.y > 0.0 && suv.x < 1.0 && suv.y < 1.0) {
@@ -348,14 +348,15 @@ void main(){
   vLabel = aLabel;
   vSize = aBox.zw;
   vRot = rot;
-  vLed = aLed;
+  float lit = uP - aLed.a;
+  vLed = vec4(aLed.rgb, aLed.a > 0.0 ? clamp(lit / 0.004, 0.0, 1.0) * (1.0 + 1.2 * exp(-max(0.0, lit) / 0.005)) : 0.0);
   gl_Position = dr > 0.999 ? vec4(2.0, 2.0, 2.0, 1.0) : uVP * vec4(vW, 1.0);
 }`
 
 const FS_PART = `#version 300 es
 precision highp float;
 in vec3 vW; in vec3 vN; in vec3 vL; flat in vec4 vMeta; flat in vec4 vLabel; flat in vec2 vSize; flat in float vRot; flat in vec4 vLed; out vec4 o;
-uniform sampler2D tAtlas; uniform vec2 uCell; uniform vec3 uFinish; uniform float uLedOn; uniform float uHeat;
+uniform sampler2D tAtlas; uniform vec2 uCell; uniform vec3 uFinish; uniform float uHeat;
 ${LIGHTING}
 ${MARKING}
 void main(){
@@ -400,8 +401,8 @@ void main(){
     alb = mix(alb, vec3(0.5), band);
   } else if (kind == 5) {     // LED: milky lens that lights at power-on, from its centre, so neighbours keep a dark gap
     float lens = top * (1.0 - smoothstep(0.3, 0.44, max(abs(vL.x), abs(vL.y))));
-    alb = mix(vec3(0.3, 0.3, 0.28), vLed.rgb, 0.25) * (1.0 - 0.6 * uLedOn * lens); rough = 0.2;
-    emit = vLed.rgb * uLedOn * 2.3 * vLed.a * (lens + 0.1 * (1.0 - top));
+    alb = mix(vec3(0.3, 0.3, 0.28), vLed.rgb, 0.25) * (1.0 - 0.6 * min(vLed.a, 1.0) * lens); rough = 0.2;
+    emit = vLed.rgb * 2.3 * vLed.a * (lens + 0.1 * (1.0 - top));
   } else if (kind == 6) {     // crystal: a metal can
     alb = vec3(0.72, 0.73, 0.75); metal = 1.0; rough = 0.3;
   } else if (kind == 7) {     // connector: black plastic, a grid of gold pins on top
@@ -471,14 +472,15 @@ void main(){
   vMeta = aMeta;
   vLabel = aLabel;
   vSize = aBox.zw;
-  vLed = aLed;
+  float lit = uP - aLed.a;
+  vLed = vec4(aLed.rgb, aLed.a > 0.0 ? clamp(lit / 0.004, 0.0, 1.0) * (1.0 + 1.2 * exp(-max(0.0, lit) / 0.005)) : 0.0);
   gl_Position = dr > 0.999 ? vec4(2.0, 2.0, 2.0, 1.0) : uVP * vec4(vW, 1.0);
 }`
 
 const FS_MESH = `#version 300 es
 precision highp float;
 in vec3 vW; in vec3 vN; in vec3 vL; in vec2 vQ; in vec3 vCol; flat in vec4 vMeta; flat in vec4 vLabel; flat in vec2 vSize; flat in vec4 vLed; out vec4 o;
-uniform sampler2D tAtlas; uniform vec2 uCell; uniform float uLedOn;
+uniform sampler2D tAtlas; uniform vec2 uCell;
 ${LIGHTING}
 ${MARKING}
 void main(){
@@ -492,6 +494,9 @@ void main(){
   float gold = step(0.4, lum) * step(0.15, chroma) * step(vCol.g, vCol.r) * step(vCol.b + 0.2, vCol.r);
   float metal = max(step(0.55, lum) * step(chroma, 0.1), gold);
   vec3 alb = max(pow(vCol, vec3(2.2)), vec3(0.02));
+  // stock model paint is loud: plastic keeps its hue but sinks toward a dark neutral, so no sleeve outshouts the copper
+  float grey = dot(alb, vec3(0.2126, 0.7152, 0.0722));
+  alb = mix(alb, mix(vec3(grey), alb, 0.35) * 0.45, (1.0 - metal) * smoothstep(0.12, 0.4, chroma));
   float rough = mix(0.48, 0.28, metal);
   vec3 emit = vec3(0.0);
   float top = step(0.9, N.z) * step(0.98, vL.z);
@@ -499,7 +504,7 @@ void main(){
     float m = marking(vQ) * top;
     alb = mix(alb, vec3(0.16, 0.16, 0.165), m); rough = mix(rough, 0.75, m);
   } else if (kind == 5) {
-    emit = vLed.rgb * uLedOn * 2.3 * vLed.a * smoothstep(0.4, 1.0, vL.z) * (1.0 - metal);
+    emit = vLed.rgb * 2.3 * vLed.a * smoothstep(0.4, 1.0, vL.z) * (1.0 - metal);
   }
   vec3 col = shade(N, V, alb, metal, rough, 0.045);
   col *= mix(0.45, 1.0, smoothstep(0.0, 0.35, vL.z));
@@ -888,7 +893,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
         part.rot, part.z, KIND_ID[part.kind] ?? 10, part.t,
         col, row, third, part.hero === true ? 1 : 0,
         part.skew[0], part.skew[1], part.skew[2], part.settle,
-        ...(part.led === undefined ? [0, 0, 0, 0] : [...linear(part.led.color), part.led.gain])
+        ...(part.led === undefined ? [0, 0, 0, 0] : [...linear(part.led.color).map((c) => c * (part.led?.gain ?? 1)), part.led.at])
       ]
     }
     // boxes first, round bodies after: each set draws with its own mesh
@@ -1022,8 +1027,6 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
       const maskLin = linear(m.mask)
       const maskLuma = 0.2126 * maskLin[0] + 0.7152 * maskLin[1] + 0.0722 * maskLin[2]
       const energyGain = 3.2
-      // the studio dims for the held breath before power-on, so the board's own light carries the
-      // climax; a dark mask has little to lose, so it dims less and comes back further for the poster
       // lights down for the held breath, so the board's own light carries power-on; the studio comes
       // most of the way back before the poster cut, leaving room for the lit rails to read in the hold
       const out = 0.45 + 0.3 * Math.pow(maskLuma, 1 / 2.2)
@@ -1055,6 +1058,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
           const fr = diag * 3
           P.floor.use().m4('uVP', c.vp).f('uRegion', centre.x - fr, centre.y - fr, fr * 2, fr * 2).f('uZ', floorZ)
             .i('tSurf', 0).i('tTop', 1).i('tFx', 2).f('uMap', ...regionV).f('uCentre', centre.x, centre.y).f('uSpread', diag * 0.75)
+            .f('uPool', 1 + 1.8 * (1 - Math.min(1, Math.pow(maskLuma, 1 / 2.2) / 0.5)))
             .v3('uWarm', warmC).v3('uCool', coolC).f('uKeyDir', Math.cos(keyAz), Math.sin(keyAz), 0)
           g.drawArrays(g.TRIANGLE_STRIP, 0, 4)
         }
@@ -1104,7 +1108,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
           tex(0, atlasTex)
           P.part.use().m4('uVP', c.vp).f('uP', q).f('uDur', tl.durationSeconds).f('uFall', 6 * m.pxPerMm)
             .i('tAtlas', 0).f('uCell', 1 / ATLAS_COLS, 1 / ATLAS_ROWS).v3('uFinish', linear(m.finish))
-            .f('uLedOn', span([acts.power[0] + 2 / 24, acts.power[0] + 2 / 24 + 0.01])).f('uHeat', span([acts.power[0], acts.power[0] + 3 / 24]))
+            .f('uHeat', span([acts.power[0], acts.power[0] + 3 / 24]))
           lighting(P.part, c, p, room)
           if (boxCount > 0) {
             point(0)
@@ -1123,7 +1127,6 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
           if (meshDraws.length > 0) {
             P.mesh.use().m4('uVP', c.vp).f('uP', q).f('uDur', tl.durationSeconds).f('uFall', 6 * m.pxPerMm)
               .i('tAtlas', 0).f('uCell', 1 / ATLAS_COLS, 1 / ATLAS_ROWS)
-              .f('uLedOn', span([acts.power[0] + 2 / 24, acts.power[0] + 2 / 24 + 0.01]))
             lighting(P.mesh, c, p, room)
             const vertex = ([['aPos', 3, g.FLOAT, false], ['aNor', 3, g.BYTE, true], ['aCol', 3, g.UNSIGNED_BYTE, true]] as const).map(([n, size, type, normalized]) => ({ loc: g.getAttribLocation(P.mesh.p, n), size, type, normalized }))
             const perPart = ['aAff', 'aBox', 'aMeta', 'aLabel', 'aSkew', 'aLed'].map((n) => g.getAttribLocation(P.mesh.p, n))
