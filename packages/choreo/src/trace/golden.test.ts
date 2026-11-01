@@ -20,7 +20,7 @@ describe('approved trace schedule', () => {
   it('pins seg/pad counts and the earliest growth times', () => {
     const segCount = scene.layers.reduce((n, l) => n + l.segs.length / 7, 0)
     expect(segCount).toMatchInlineSnapshot(`4715`)
-    expect(scene.pads.length).toMatchInlineSnapshot(`1149`)
+    expect(scene.pads.length).toMatchInlineSnapshot(`1145`)
     expect(scene.beats).toMatchInlineSnapshot(`
       {
         "growth": [

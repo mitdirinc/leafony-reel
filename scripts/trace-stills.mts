@@ -24,7 +24,7 @@ try {
     const own = arg.endsWith('.kicad_pcb')
     const board = own ? path.basename(arg, '.kicad_pcb') : arg
     const size = ASPECT_SIZE[aspect as Aspect]
-    const config = { ...defaultFilmConfig(board), style: process.env.STYLE ?? 'trace', aspect, output: { ...defaultFilmConfig(board).output, ...size } } as unknown as FilmConfig
+    const config = { ...defaultFilmConfig(board), style: process.env.STYLE ?? 'trace', aspect, ...(process.env.TITLE === undefined ? {} : { title: { name: process.env.TITLE } }), output: { ...defaultFilmConfig(board).output, ...size } } as unknown as FilmConfig
     const model = own ? parseKicadPcb(readFileSync(arg, 'utf8'), path.basename(arg)) : await loadDemoBoard(board)
     const dirs = process.env.SILK_REEL_MODELS?.split(path.delimiter) ?? []
     const bodies = dirs[0] === 'none' ? undefined : (await loadPartBodies(model, { boardDir: own ? path.dirname(path.resolve(arg)) : path.join(root, 'fixtures/boards'), dirs })).bodies

@@ -1,4 +1,4 @@
-import type { BBox, BoardModel, Pad, Vec2 } from '@silk-reel/ingest'
+import type { BBox, BoardModel, DrillHit, Pad, Vec2 } from '@silk-reel/ingest'
 import { fitBoard, safeArea } from '../layout'
 import type { ResolvedConfig } from '../config'
 import type {
@@ -279,9 +279,13 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
   const npth = board.drill.filter((d) => !d.plated)
   const drillOnly = (pad: Pad): boolean =>
     npth.some((d) => Math.hypot(d.pos.x - pad.pos.x, d.pos.y - pad.pos.y) < 0.05)
+  const slotOf = (d: DrillHit): Pad | undefined => d.plated ? undefined
+    : [...padLayerSets.values()].find(({ pad }) => Math.hypot(d.pos.x - pad.pos.x, d.pos.y - pad.pos.y) < 0.05 && Math.max(pad.size.x, pad.size.y) <= d.dia + 0.05)?.pad
+  const bare = new Set(npth.map(slotOf).filter((pad) => pad !== undefined))
   const pxMin = Math.min(resolved.width, resolved.height)
   const pads: TracePad[] = []
   for (const { pad, sides } of padLayerSets.values()) {
+    if (bare.has(pad)) continue
     const m = map(pad.pos)
     const own = heroPads.has(`${pad.pos.x.toFixed(3)},${pad.pos.y.toFixed(3)}`)
     const reached = own
@@ -412,9 +416,21 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
     t: s0 + 0.01 + (textRaw.length > 1 ? (i / (textRaw.length - 1)) * (s1 - s0 - 0.03) : 0)
   }))
 
-  const drills = board.drill.map((d) => {
-    const m = map(d.pos)
-    return { x: m.x, y: m.y, r: Math.max(0.8, (d.dia / 2) * fit.scale) }
+  const drills = board.drill.flatMap((d) => {
+    const slot = slotOf(d)
+    const long = slot === undefined ? 0 : Math.max(slot.size.x, slot.size.y)
+    const short = slot === undefined ? d.dia : Math.min(slot.size.x, slot.size.y)
+    if (slot === undefined || long < short * 1.2) {
+      const m = map(d.pos)
+      return [{ x: m.x, y: m.y, r: Math.max(0.8, (d.dia / 2) * fit.scale) }]
+    }
+    const a = (slot.rot + (slot.size.y > slot.size.x ? 90 : 0)) * DEG
+    const n = Math.ceil((long - short) / short * 4) + 1
+    return Array.from({ length: n }, (_, i) => {
+      const k = ((i / (n - 1)) - 0.5) * (long - short)
+      const m = map({ x: d.pos.x + Math.cos(a) * k, y: d.pos.y - Math.sin(a) * k })
+      return { x: m.x, y: m.y, r: Math.max(0.8, (short / 2) * fit.scale) }
+    })
   })
 
   const origin = hero !== undefined ? map(hero.center) : { x: resolved.width / 2, y: resolved.height / 2 }
@@ -848,7 +864,7 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
   const bench0 = { ...si.hero, tilt: 60 * D, yaw: benchYaw - 11 * D, aperture: 0.4 }
   const bench1 = { ...si.hero, tilt: 54 * D, yaw: benchYaw + 11 * D, aperture: 0.4 }
   const wide = { ...mid, tilt: 38 * D, yaw: heroYaw, aperture: 0.05, shift }
-  const poster = { ...mid, tilt: 52 * D, yaw: -heroYaw * 0.7, aperture: 0.08, shift }
+  const poster = { ...mid, tilt: 38 * D, yaw: -heroYaw * 1.4, aperture: 0.08, shift }
   // the poster holds the board and a connector overhanging its edge, but not a part standing well clear of it
   const reach = 0.08 * Math.max(x1 - x0, y1 - y0)
   const off = si.bodies.filter(([bx, by]) => (bx < x0 || bx > x1 || by < y0 || by > y1) &&
