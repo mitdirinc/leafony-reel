@@ -121,7 +121,7 @@ uniform vec3 uCopper; uniform vec3 uFinish; uniform vec3 uMask; uniform vec3 uSu
 uniform vec3 uWarm; uniform vec3 uCool; uniform vec3 uHead;
 uniform float uFinishRough; uniform float uMaskFront; uniform float uMaskSoft; uniform float uMaskOn; uniform float uMaskLuma;
 uniform float uCured; uniform float uFinishOn; uniform float uEnergy; uniform float uPxPerMm; uniform float uBump;
-uniform float uHeat; uniform float uHeatX; uniform float uHeatW; uniform float uDark; uniform vec2 uOrigin; uniform vec2 uMaskDir;
+uniform float uDark; uniform vec2 uOrigin; uniform vec2 uMaskDir;
 ${LIGHTING}
 float hcu(vec2 uv, float lod){ return smoothstep(0.2, 0.8, textureLod(tTop, uv, lod).r); }
 vec2 gradH(float s, float lod){
@@ -174,13 +174,13 @@ void main(){
   vec3 maskAlb = mix(uMask * sink, min(uMask * lift + uCopper * mix(0.018, 0.02, uMaskLuma), vec3(0.82)), cu);
   vec3 maskC = shade(Nm, V, maskAlb, 0.0, mix(0.05, mix(0.08, 0.16, uCured), 1.0 - wet), 0.05);
   col = mix(col, maskC, masked);
+  // the wet front catches the key as a bright line, so even a black coat is seen arriving
+  col += vec3(0.42, 0.44, 0.47) * wet * (1.0 - uMaskLuma) * (1.0 - max(pad, hole));
   vec3 Ns = normalize(vec3(-gs.x, gs.y, 1.0));
   col = mix(col, shade(Ns, V, uSilk, 0.0, 0.7, 0.04), silk * (0.4 + 0.6 * poured * uMaskOn));
   col = mix(col, vec3(0.0015), hole * (1.0 - pad));
   // parts shade the board around their bodies
   col *= 1.0 - 0.8 * clamp(shadow, 0.0, 1.0);
-  // the reflow oven: a warm band of heat crossing the board
-  col += uWarm * 0.05 * uHeat * exp(-sq((vW.x - uHeatX) / uHeatW)) * area;
   // light: the only thing brighter than a lit surface. under the coat it spreads a little
   // a pale mask scatters what is under it far more than a dark one
   float scatter = masked * mix(0.6, 0.95, uMaskLuma);
@@ -826,7 +826,6 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
   let valveCount = 0
   let meshDraws: Array<{ pos: WebGLBuffer; nor: WebGLBuffer; col: WebGLBuffer; idx: WebGLBuffer; inst: WebGLBuffer; count: number; parts: number; min: number[]; max: number[] }> = []
   let extent: Region = { x: 0, y: 0, w: width, h: height }
-  let boardX: [number, number] = [0, width]
   const CELL_W = 256
   const CELL_H = 64
   const ATLAS_COLS = 8
@@ -858,7 +857,6 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
     }
     const m = 0.06 * Math.max(x1 - x0, y1 - y0)
     extent = Number.isFinite(x0) ? { x: x0 - m, y: y0 - m, w: x1 - x0 + 2 * m, h: y1 - y0 + 2 * m } : { x: 0, y: 0, w: width, h: height }
-    boardX = Number.isFinite(x0) ? [x0, x1] : [0, width]
     g.bindBuffer(g.ARRAY_BUFFER, wallBuf)
     g.bufferData(g.ARRAY_BUFFER, new Float32Array(walls), g.STATIC_DRAW)
     wallCount = walls.length / 4
@@ -1031,11 +1029,8 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
       const energyGain = 3.2
       // lights down for the held breath, so the board's own light carries power-on; the studio comes
       // most of the way back before the poster cut, leaving room for the lit rails to read in the hold
-      const out = 0.45 + 0.3 * Math.pow(maskLuma, 1 / 2.2)
+      const out = 0.4 + 0.1 * Math.pow(maskLuma, 1 / 2.2)
       const room = 1 - out * span([acts.reflow[1], acts.power[0]]) + out * (0.6 - 0.25 * Math.pow(maskLuma, 1 / 2.2)) * span([18.5 / 24, 20 / 24])
-      const heatSpan = (acts.reflow[1] - acts.reflow[0]) - 0.5 / 24
-      const heatU = (p - acts.reflow[0]) / heatSpan
-      const heat = Math.min(span([acts.reflow[0] - 0.01, acts.reflow[0] + 0.01]), 1 - span([acts.reflow[1] - 0.01, acts.reflow[1] + 0.01]))
       const centre = { x: extent.x + extent.w / 2, y: extent.y + extent.h / 2 }
       const diag = Math.hypot(extent.w, extent.h)
       const floorZ = -Math.max(1.5, m.thicknessPx) - 0.5
@@ -1090,7 +1085,6 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
           .f('uFinishRough', m.finishRough).f('uMaskFront', maskFront).f('uMaskSoft', soft).f('uMaskOn', maskOn).f('uMaskLuma', Math.pow(maskLuma, 1 / 2.2))
           .f('uCured', span([acts.mask[1], acts.mask[1] + 0.04])).f('uFinishOn', span([acts.mask[1] - 0.01, acts.mask[1] + 0.02]))
           .f('uEnergy', energyGain).f('uPxPerMm', m.pxPerMm).f('uBump', 1.6)
-          .f('uHeat', heat).f('uHeatX', boardX[0] + heatU * (boardX[1] - boardX[0])).f('uHeatW', 0.12 * extent.w)
           .f('uOrigin', s.origin.x, s.origin.y).f('uMaskDir', ...maskDir).f('uDark', 1 - span([acts.draw[1] - 1 / 24, acts.mask[0] + 0.5 / 24]))
         lighting(P.top, c, p, room)
         g.drawArrays(g.TRIANGLE_STRIP, 0, 4)

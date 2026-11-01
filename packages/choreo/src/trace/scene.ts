@@ -423,8 +423,11 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
   // --- parts: set down on wet paste outward from the hero, then snapped square as the reflow front passes
   const loopsPx = boardLoops(board).map((loop) => flat(loop, map))
   const xs = loopsPx.flatMap((l) => l.filter((_, i) => i % 2 === 0))
+  const ys = loopsPx.flatMap((l) => l.filter((_, i) => i % 2 === 1))
   const bx0 = Math.min(...xs)
   const bx1 = Math.max(...xs)
+  const by0 = Math.min(...ys)
+  const by1 = Math.max(...ys)
   const rotOf = (deg: number): number => (back ? -deg : deg) * DEG + (fit.rotated ? Math.PI / 2 : 0)
   const partsMm = extractParts(board).filter((pt) => pt.back === back)
   const heroPart = partsMm.find((pt) => pt.ref === hero?.ref)
@@ -485,6 +488,8 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
       mesh: solid
     }
     const pinW = 0.64 * (pt.pinZ ?? 0) / 8.5 * fit.scale
+    // a model that stands clear of the board (a part mounted off it, or placed wrong) would steal the frame
+    if (!isHero && (m.x < bx0 || m.x > bx1 || m.y < by0 || m.y > by1)) return []
     return [body, ...(solid === undefined ? pt.pins ?? [] : []).map((pin): TracePart => ({
       ...map(pin), w: pinW, h: pinW, rot: body.rot, z: (pt.pinZ ?? 0) * fit.scale, kind: 'pin', t, settle, skew: [0, 0, 0], seat: body.z
     }))]

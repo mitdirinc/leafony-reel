@@ -225,8 +225,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
   for (const zone of s.zones) {
     const frac = ease((p - zone.t0) / Math.max(1e-6, zone.t1 - zone.t0))
     if (frac <= 0) continue
-    const live = zone.e0 >= 0 && p >= zone.e0
-    ctx.strokeStyle = live ? red : faint
+    ctx.strokeStyle = faint
     ctx.globalAlpha = frac * (zone.side === 'F' ? 1 : 0.5)
     ctx.lineWidth = 0.7 * u
     polyPath(ctx, v, zone.fill)
@@ -334,10 +333,10 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
 
   if (p >= A.power[0]) {
     ctx.strokeStyle = red
-    ctx.lineWidth = 2 * u
     for (const layer of s.layers) {
       if (layer.side !== topSide) continue
-      const path = new Path2D()
+      // one solid red stroke over the track, capped so a wide rail stays a line, not a slab
+      const byWidth = new Map<number, Path2D>()
       for (let j = 0; j * 7 + 6 < layer.segs.length; j++) {
         const e0 = layer.energy[j * 2] as number
         const e1 = layer.energy[j * 2 + 1] as number
@@ -352,11 +351,20 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
         const a = toScreen(v, ax, ay)
         const b = toScreen(v, ax + dx * k, ay + dy * k)
         if (!a || !b) continue
+        const key = Math.round(Math.min(4 * u, Math.max(2 * u, (layer.segs[o + 4] as number) * planScale)) * 2) / 2
+        let path = byWidth.get(key)
+        if (path === undefined) {
+          path = new Path2D()
+          byWidth.set(key, path)
+        }
         path.moveTo(a[0], a[1])
         path.lineTo(b[0], b[1])
         drawn += 1
       }
-      ctx.stroke(path)
+      for (const [w, path] of byWidth) {
+        ctx.lineWidth = w
+        ctx.stroke(path)
+      }
     }
   }
 
@@ -477,6 +485,8 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
   }
   bodies.sort((a, b) => b.d - a.d)
   for (const { part, at } of bodies) {
+    // a tall housing is capped low, so no blank block outweighs the hero
+    const z = part.hero === true ? part.z : Math.min(part.z, 2 * m.pxPerMm)
     const cr = Math.cos(at.rot)
     const sr = Math.sin(at.rot)
     const ring = (z: number, n: number, round: boolean): Pt[] => {
@@ -492,7 +502,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     }
     const round = ROUND.has(part.kind)
     const n = round ? 24 : 4
-    const top = ring(part.z, n, round)
+    const top = ring(z, n, round)
     const bot = ring(0, n, round)
     if (top.length < n || bot.length < n) continue
     const lit = part.led !== undefined && part.led.at >= 0 && p >= part.led.at
@@ -508,7 +518,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
         const ly = (i === 0 ? -0.5 : i === 1 ? 0 : i === 2 ? 0.5 : 0) * part.h
         const fx = at.x + lx * cr - ly * sr
         const fy = at.y + lx * sr + ly * cr
-        return { pts, d: Math.hypot(fx - eye[0], -fy - eye[1], at.lift + part.z / 2 - eye[2]) }
+        return { pts, d: Math.hypot(fx - eye[0], -fy - eye[1], at.lift + z / 2 - eye[2]) }
       })
       faces.sort((x, y) => y.d - x.d)
       for (const f of faces) fillStroke(ctx, f.pts, paper)
@@ -522,7 +532,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
         for (let iy = 0; iy < ny; iy++) {
           const lx = (ix + 0.5 - nx / 2) * part.pitch
           const ly = (iy + 0.5 - ny / 2) * part.pitch
-          const q = toScreen(v, at.x + lx * cr - ly * sr, at.y + lx * sr + ly * cr, at.lift + part.z)
+          const q = toScreen(v, at.x + lx * cr - ly * sr, at.y + lx * sr + ly * cr, at.lift + z)
           if (!q) continue
           const r = 0.9 * u
           ctx.rect(q[0] - r, q[1] - r, 2 * r, 2 * r)
@@ -532,7 +542,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
       ctx.fill()
     }
     if (part.label !== undefined) {
-      const k = localAffine(ctx, v, at.x, at.y, at.lift + part.z)
+      const k = localAffine(ctx, v, at.x, at.y, at.lift + z)
       if (k > 0) {
         ctx.translate(at.x, at.y)
         ctx.rotate(at.rot + (part.h > part.w ? Math.PI / 2 : 0))

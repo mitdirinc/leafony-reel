@@ -270,25 +270,27 @@ export function drawMaps(maps: MapSet, tl: TraceTimeline, p: number, region: Reg
     }
     top.restore()
   }
-  // the hero wakes as the rails reach it: light leaks out from under its body, then settles to a glow
+  // the hero wakes as the rails reach it: its own pins light, flaring once, then hold a warm glow
   const wake = s.acts.power[0] + WAKE
   if (p >= wake) {
-    const k = 0.6 + 0.3 * Math.max(0, 1 - (p - wake) / 0.04)
+    const k = 0.55 + 0.45 * Math.max(0, 1 - (p - wake) / 0.04)
     for (const part of s.parts) {
       if (part.hero !== true) continue
-      top.save()
-      top.translate(part.x, part.y)
-      top.rotate(part.rot)
-      const rim = 0.11 * Math.min(part.w, part.h)
-      for (let ring = 0; ring < 6; ring++) {
-        const r = rim * (1 - ring * 0.17)
-        top.fillStyle = ink(2, k * 0.22)
-        top.beginPath()
-        top.rect(-part.w / 2 - r, -part.h / 2 - r, part.w + 2 * r, part.h + 2 * r)
-        top.rect(-part.w / 2 + rim * 0.1, -part.h / 2 + rim * 0.1, part.w - rim * 0.2, part.h - rim * 0.2)
-        top.fill('evenodd')
+      const c = Math.cos(-part.rot)
+      const sn = Math.sin(-part.rot)
+      const reach = 0.12 * Math.min(part.w, part.h)
+      top.fillStyle = ink(2, k)
+      for (const pad of s.pads) {
+        const dx = pad.x - part.x
+        const dy = pad.y - part.y
+        if (Math.abs(dx * c - dy * sn) > part.w / 2 + reach || Math.abs(dx * sn + dy * c) > part.h / 2 + reach) continue
+        top.save()
+        top.translate(pad.x, pad.y)
+        top.rotate(pad.rot)
+        padPath(top, pad.w * 1.15, pad.h * 1.15, pad.shape)
+        top.fill()
+        top.restore()
       }
-      top.restore()
     }
   }
   // vias: a copper ring once the routing reaches them
