@@ -189,7 +189,8 @@ void main(){
   // capped, so a crowd of pads stays a set of lines instead of swelling into a halo;
   // only a pale coat, which really does glow from within, lifts the cap
   float cap = mix(0.5, 1.25, masked * smoothstep(0.4, 0.8, uMaskLuma));
-  float warm = min(mix(a.b, textureLod(tTop, vUv, lod).b * spread, scatter), cap);
+  // the rails are a held glow, never brighter than the hero's own streaks
+  float warm = min(mix(a.b, textureLod(tTop, vUv, lod).b * spread, scatter), cap * 0.65);
   float cool = min(mix(fx.r, textureLod(tFx, vUv, lod).r * spread, scatter), cap + 0.2);
   // under a pale coat light glows through as a deeper amber, not a white glare on white
   float pale = masked * smoothstep(0.5, 0.9, uMaskLuma);
@@ -1029,7 +1030,7 @@ export function createTraceGL(width: number, height: number, quality: TraceQuali
       const energyGain = 3.2
       // the room goes down on the power beat itself, so the board's own light carries power-on; a pale
       // board stays darker into the poster, where the hero's light would otherwise wash out
-      const out = 0.4 + 0.25 * Math.pow(maskLuma, 1 / 2.2)
+      const out = 0.4 + 0.35 * Math.pow(maskLuma, 1 / 2.2)
       const room = 1 - out * span([acts.power[0] - 0.25 / 24, acts.power[0] + 0.5 / 24]) + out * (0.6 - 0.35 * Math.pow(maskLuma, 1 / 2.2)) * span([18.5 / 24, 20 / 24])
       const centre = { x: extent.x + extent.w / 2, y: extent.y + extent.h / 2 }
       const diag = Math.hypot(extent.w, extent.h)

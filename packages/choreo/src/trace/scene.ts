@@ -283,7 +283,8 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
   const pads: TracePad[] = []
   for (const { pad, sides } of padLayerSets.values()) {
     const m = map(pad.pos)
-    const reached = heroPads.has(`${pad.pos.x.toFixed(3)},${pad.pos.y.toFixed(3)}`)
+    const own = heroPads.has(`${pad.pos.x.toFixed(3)},${pad.pos.y.toFixed(3)}`)
+    const reached = own
       ? g0
       : earliestAt(pad.pos, Math.max(pad.size.x, pad.size.y) / 2 + 0.1)
     pads.push({
@@ -297,7 +298,8 @@ export function buildTraceScene(board: BoardModel, resolved: ResolvedConfig, see
       side: sides.size > 1 ? 'both' : ([...sides][0] === 'F' ? 'F' : 'B'),
       ring:
         Math.min(pad.size.x, pad.size.y) * fit.scale > 0.03 * pxMin ||
-        drillOnly(pad)
+        drillOnly(pad),
+      hero: own || undefined
     })
   }
 
@@ -774,8 +776,9 @@ interface ShotInput {
  *             it, pulling back to the whole board, then tilting down into a
  *             three-quarter as the mask coats: the drawing becomes an object
  *  2 bench  — low and close on the hero: parts set down, the reflow snap
- *  3 alive  — the held breath, then power-on, close on the hero's half of the
- *             board under a slow arc, so the first light reads on a phone
+ *  3 alive  — the held breath, then power-on back at the opening's angle,
+ *             close on the hero, pulling out over its half of the board as
+ *             its light runs out
  *  4 poster — cut wide to the other side on the bar: the whole running board,
  *             a slow push, held to the last frame
  * Every framing is solved against the board's real extent, so long boards
@@ -865,7 +868,8 @@ function shotList(resolved: ResolvedConfig, si: ShotInput): CameraShot[] {
     { t: a.place[0] - 0.001, ...framed(tilted, 1.12, corners(0)) },
     { t: a.place[0], ...bench0, zoom: benchZoom, cut: true },
     { t: a.reflow[1] - 0.001, ...bench1, zoom: benchZoom * 1.12 },
-    { t: a.reflow[1], ...alive, zoom: aliveZoom, cut: true },
+    // power-on returns to the opening's angle, close on the hero, and pulls back as its light runs out
+    { t: a.reflow[1], ...si.hero, tilt: 50 * D, yaw: openYaw, zoom: Math.max(aliveZoom * 1.3, Math.min(macro * 0.5, benchZoom * 1.3)), aperture: 0.25, cut: true },
     { t: 20 / 24 - 0.001, ...alive, yaw: heroYaw * 0.75, zoom: aliveZoom * 1.04 },
     { t: 20 / 24, ...posterA, cut: true },
     { t: 1, ...posterB }

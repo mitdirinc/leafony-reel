@@ -311,6 +311,8 @@ export interface TracePad {
   side: 'F' | 'B' | 'both'
   /** mounting holes and oversized pads draw as rings, never filled blobs */
   ring?: boolean | undefined
+  /** one of the hero's own pads: it lights when the hero wakes */
+  hero?: boolean | undefined
 }
 export interface TraceVia { x: number; y: number; r: number; t: number }
 export interface TraceZone {

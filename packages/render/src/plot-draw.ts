@@ -307,7 +307,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
     else ctx.rect(-pad.w / 2, -pad.h / 2, pad.w, pad.h)
     ctx.lineWidth = hair / k
     ctx.strokeStyle = back ? pen2 : faint
-    ctx.globalAlpha = back ? 0.5 : 1
+    ctx.globalAlpha = back ? 0.35 : 0.6
     if (!back) {
       ctx.fillStyle = paper
       ctx.fill()
@@ -372,7 +372,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
   }
 
   ctx.strokeStyle = pen2
-  ctx.globalAlpha = 0.8
+  ctx.globalAlpha = 0.35
   ctx.lineWidth = 0.8 * u
   for (const stroke of s.silkStrokes) {
     const frac = ease((p - stroke.t) / 0.03)
@@ -529,7 +529,7 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
       for (const f of faces) fillStroke(ctx, f.pts, paper)
     }
     fillStroke(ctx, top, paper)
-    if (part.kind === 'conn' && part.pitch !== undefined && part.pitch > 0) {
+    if (part.hero === true && part.kind === 'conn' && part.pitch !== undefined && part.pitch > 0) {
       const nx = Math.max(1, Math.floor(part.w / part.pitch))
       const ny = Math.max(1, Math.floor(part.h / part.pitch))
       ctx.beginPath()
@@ -554,8 +554,8 @@ export function drawPlotFrame(ctx: CanvasRenderingContext2D, tl: TraceTimeline, 
         upright(ctx)
         const len = Math.max(part.w, part.h)
         const size = Math.min(Math.min(part.w, part.h) * 0.2, (len * 0.8) / Math.max(4, part.label.length * 0.62))
-        ctx.font = `${size}px ${FONT}`
-        ctx.fillStyle = part.hero === true ? red : ink
+        ctx.font = `${part.hero === true ? '600 ' : ''}${size}px ${FONT}`
+        ctx.fillStyle = part.hero === true ? red : pen2
         ctx.fillText(part.label, 0, 0)
       }
       ctx.setTransform(1, 0, 0, 1, 0, 0)

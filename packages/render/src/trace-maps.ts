@@ -102,12 +102,12 @@ function streak(
  * lit; the hero's own lines carry one cool streak out of it and settle to an ember.
  */
 const ROLE_LOOK: Record<TraceGroup['kind'], { cool: boolean; grow: number; tail: number; steady: number }> = {
-  power: { cool: false, grow: 1.2, tail: 0.06, steady: 0.2 },
+  power: { cool: false, grow: 0.6, tail: 0.04, steady: 0.2 },
   ground: { cool: false, grow: 0, tail: 0.01, steady: 0 },
-  clock: { cool: true, grow: 0.9, tail: 0.03, steady: 0.12 },
-  bus: { cool: true, grow: 0.8, tail: 0.03, steady: 0.12 },
-  diff: { cool: true, grow: 0.8, tail: 0.03, steady: 0.12 },
-  signal: { cool: true, grow: 0.6, tail: 0.03, steady: 0.12 }
+  clock: { cool: true, grow: 1.2, tail: 0.04, steady: 0.12 },
+  bus: { cool: true, grow: 1.1, tail: 0.04, steady: 0.12 },
+  diff: { cool: true, grow: 1.1, tail: 0.04, steady: 0.12 },
+  signal: { cool: true, grow: 1.0, tail: 0.04, steady: 0.12 }
 }
 
 /** the hero wakes this long after power-on, once the rails have reached it */
@@ -182,10 +182,12 @@ function drawCopperLayer(
     const grp = scene.groups[groups[i] as number] as TraceGroup
     const look = ROLE_LOOK[grp.kind]
     const light = look.cool ? cool : warm
-    streak(light, x0, y0, x1, y1, w, e0, e1, p, look.grow, look.tail)
+    // a wide trace carries its light as a core line, not a flooded slab
+    const lw = Math.min(w, 2.5)
+    streak(light, x0, y0, x1, y1, lw, e0, e1, p, look.grow, look.tail)
     if (look.steady > 0 && p > e1) {
-      light.ctx.strokeStyle = ink(light.ch, look.steady * Math.min(1, 3 / w) * within(p, e1, e1 + 0.02))
-      light.ctx.lineWidth = Math.min(w * 1.5, w + 2)
+      light.ctx.strokeStyle = ink(light.ch, look.steady * within(p, e1, e1 + 0.02))
+      light.ctx.lineWidth = lw * 1.5
       light.ctx.beginPath()
       light.ctx.moveTo(x0, y0)
       light.ctx.lineTo(x1, y1)
@@ -273,24 +275,16 @@ export function drawMaps(maps: MapSet, tl: TraceTimeline, p: number, region: Reg
   // the hero wakes as the rails reach it: its own pins light, flaring once, then hold a warm glow
   const wake = s.acts.power[0] + WAKE
   if (p >= wake) {
-    const k = 0.4 + 0.6 * Math.max(0, 1 - (p - wake) / 0.04)
-    for (const part of s.parts) {
-      if (part.hero !== true) continue
-      const c = Math.cos(-part.rot)
-      const sn = Math.sin(-part.rot)
-      const reach = 0.12 * Math.min(part.w, part.h)
-      top.fillStyle = ink(2, k)
-      for (const pad of s.pads) {
-        const dx = pad.x - part.x
-        const dy = pad.y - part.y
-        if (Math.abs(dx * c - dy * sn) > part.w / 2 + reach || Math.abs(dx * sn + dy * c) > part.h / 2 + reach) continue
-        top.save()
-        top.translate(pad.x, pad.y)
-        top.rotate(pad.rot)
-        padPath(top, pad.w * 1.15, pad.h * 1.15, pad.shape)
-        top.fill()
-        top.restore()
-      }
+    const k = 0.35 + 0.3 * Math.max(0, 1 - (p - wake) / 0.04)
+    top.fillStyle = ink(2, k)
+    for (const pad of s.pads) {
+      if (pad.hero !== true) continue
+      top.save()
+      top.translate(pad.x, pad.y)
+      top.rotate(pad.rot)
+      padPath(top, pad.w * 1.15, pad.h * 1.15, pad.shape)
+      top.fill()
+      top.restore()
     }
   }
   // vias: a copper ring once the routing reaches them
