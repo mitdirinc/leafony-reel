@@ -11,17 +11,18 @@ describe('parseCliArgs', () => {
     expect(a.config.output).toMatchObject({ width: 1080, height: 1350 })
     expect(a.config.cast?.preferRefs).toContain('U1') // fixture boards keep the studio's cast hints
     expect(a.config.transparent).toBeUndefined()
+    expect(a.config.credit).toBeUndefined()
   })
 
   it('round-trips every flag', () => {
     const a = parseCliArgs([
       'x/ice.kicad_pcb', '-o', '/tmp/ice.webm', '--style', 'glyph', '--aspect', '9:16', '--palette', 'blueprint',
       '--accent', '#ff00aa', '--title', 'iCEBreaker', '--version', 'v1.0e', '--seed', '7', '--tempo', '1.2',
-      '--format', 'webm-alpha'
+      '--format', 'webm-alpha', '--credit'
     ])
     expect(a).toMatchObject({ input: 'x/ice.kicad_pcb', out: '/tmp/ice.webm', format: 'webm-alpha' })
     expect(a.config).toMatchObject({
-      style: 'glyph', aspect: '9:16', palette: 'blueprint', accent: '#ff00aa', seed: 7, transparent: true,
+      style: 'glyph', aspect: '9:16', palette: 'blueprint', accent: '#ff00aa', seed: 7, transparent: true, credit: true,
       title: { name: 'iCEBreaker', version: 'v1.0e' }, knobs: { tempo: 1.2 },
       output: { width: 1080, height: 1920 }
     })

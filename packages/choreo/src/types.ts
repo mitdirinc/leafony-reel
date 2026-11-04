@@ -123,6 +123,8 @@ export interface FilmConfig {
   /** #rrggbb — overrides palette.head and tints copper */
   accent?: string
   title?: TitleCard
+  /** a small "made with silk reel" line on the held frame; off unless asked */
+  credit?: boolean
   /** alpha-capable output: no background, no vignette/grain */
   transparent?: boolean
   /** glyph cadence: 'twos' holds each 15fps step for 2 frames; 'smooth' interpolates */
@@ -152,6 +154,7 @@ interface TimelineBase {
   output: { width: number; height: number; fps: number }
   palette: Palette
   title?: TitleCard | undefined
+  credit: boolean
   transparent: boolean
   warnings: TimelineWarning[]
   seedUsed: number

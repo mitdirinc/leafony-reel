@@ -19,6 +19,7 @@ function titleWindow(tl: Timeline): readonly [number, number] | undefined {
  * `fadeAlpha` is the caller's film-level fade (trace fade beat / glyph breath).
  */
 export function drawTitle(ctx: CanvasRenderingContext2D, tl: Timeline, p: number, fadeAlpha: number): void {
+  if (tl.credit) drawCredit(ctx, tl, p, fadeAlpha)
   const card = tl.title
   if (card === undefined) return
   const win = titleWindow(tl)
@@ -66,5 +67,27 @@ export function drawTitle(ctx: CanvasRenderingContext2D, tl: Timeline, p: number
     ctx.globalAlpha = alpha * 0.75
     if (shownV.length > 0) ctx.fillText(shownV, a.x, ruleY + 0.032 * tl.height)
   }
+  ctx.restore()
+}
+
+/** "made with silk reel", bottom-right: in on the hold beat, or held for the whole glyph loop so the seam stays clean */
+function drawCredit(ctx: CanvasRenderingContext2D, tl: Timeline, p: number, fadeAlpha: number): void {
+  const win = titleWindow(tl)
+  const alpha = (win === undefined ? 1 : ease((p - win[0]) / 0.06)) * fadeAlpha * 0.6
+  if (alpha <= 0.002) return
+  const hasTitle = tl.title !== undefined
+  const a = safeArea(tl.width, tl.height, hasTitle)
+  const bandTop = a.y + a.h
+  const y = hasTitle ? bandTop + 0.045 * tl.height : bandTop + 0.55 * (tl.height - bandTop)
+  ctx.save()
+  ctx.textAlign = 'right'
+  ctx.textBaseline = 'alphabetic'
+  try {
+    ctx.letterSpacing = '0.08em'
+  } catch { /* older canvas impls */ }
+  ctx.font = `${0.02 * Math.min(tl.width, tl.height)}px ${FONT}`
+  ctx.fillStyle = tl.palette.silk
+  ctx.globalAlpha = alpha
+  ctx.fillText('made with silk reel', a.x + a.w, y)
   ctx.restore()
 }

@@ -19,6 +19,7 @@ export function compileTimeline(board: BoardModel, config: FilmConfig, bodies?: 
     output: { width: resolved.width, height: resolved.height, fps: resolved.fps },
     palette: resolved.palette,
     title: resolved.title,
+    credit: resolved.credit,
     transparent: resolved.transparent,
     seedUsed: seed
   }

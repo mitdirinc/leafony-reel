@@ -18,6 +18,7 @@ Renders a film of a KiCad board (KiCad 4 or later).
   --mask ${MASK_COLORS.join('|')}
                              solder mask colour (default: the board file's, else green)
   --title "Name"             title card; --version v1.0 adds a line under it
+  --credit                   a small "made with silk reel" line on the last frame
   --format mp4|gif|webm-alpha|prores-alpha
   --seed N                   each number gives a different variation (default 42)
   --tempo 0.75-1.5           pace (default 1)
@@ -39,6 +40,7 @@ const OPTIONS = {
   mask: { type: 'string' },
   title: { type: 'string' },
   version: { type: 'string' },
+  credit: { type: 'boolean' },
   seed: { type: 'string' },
   tempo: { type: 'string' },
   format: { type: 'string' },
@@ -139,6 +141,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
     ...(values.title !== undefined
       ? { title: { name: values.title, ...(values.version !== undefined ? { version: values.version } : {}) } }
       : {}),
+    ...(values.credit === true ? { credit: true } : {}),
     ...(isAlphaFormat(format) ? { transparent: true } : {})
   }
   const out =

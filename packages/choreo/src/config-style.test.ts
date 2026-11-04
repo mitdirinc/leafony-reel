@@ -15,6 +15,11 @@ describe('style config', () => {
     expect([r.width, r.height]).toEqual([1080, 1920])
     expect(r.knobWarnings.some((w) => w.code === 'aspect-overrides-output')).toBe(true)
   })
+  it('leaves the credit off unless asked, and rejects a non-boolean', () => {
+    expect(resolveConfig(base).credit).toBe(false)
+    expect(resolveConfig({ ...base, credit: true }).credit).toBe(true)
+    expect(() => resolveConfig({ ...base, credit: 'yes' as unknown as boolean })).toThrow(ChoreoConfigError)
+  })
   it('rejects a malformed accent', () => {
     expect(() => resolveConfig({ ...base, accent: 'red' })).toThrow(ChoreoConfigError)
   })

@@ -13,7 +13,7 @@ import type { OutputFormat } from './render-film.js'
 
 const repoRoot = path.resolve(import.meta.dirname, '../../..')
 const allowedVideoRoots = [path.join(repoRoot, 'exports'), path.join(repoRoot, 'fixtures')]
-const FILM_CONFIG_KEYS = ['knobs', 'seed', 'duration', 'output', 'cast', 'style', 'aspect', 'palette', 'accent', 'title', 'transparent', 'hero', 'mask'] as const
+const FILM_CONFIG_KEYS = ['knobs', 'seed', 'duration', 'output', 'cast', 'style', 'aspect', 'palette', 'accent', 'title', 'credit', 'transparent', 'hero', 'mask'] as const
 const CAST_KEYS = ['preferRefs', 'preferTexts'] as const
 const KNOB_KEYS = ['texts', 'tempo'] as const
 const STYLE_IDS: readonly StyleId[] = ['trace', 'glyph', 'plot']
@@ -210,6 +210,10 @@ function parseFilmConfig(value: unknown): FilmConfigResult {
       return { ok: false, error: `filmConfig.mask must be one of ${MASK_COLORS.join(', ')}` }
     }
     config.mask = value.mask as MaskColor
+  }
+  if (Object.hasOwn(value, 'credit')) {
+    if (typeof value.credit !== 'boolean') return { ok: false, error: 'filmConfig.credit must be a boolean' }
+    config.credit = value.credit
   }
   if (Object.hasOwn(value, 'transparent')) {
     if (typeof value.transparent !== 'boolean') return { ok: false, error: 'filmConfig.transparent must be a boolean' }

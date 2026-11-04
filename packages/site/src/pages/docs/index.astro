@@ -48,7 +48,8 @@ const groups: Array<{ name: string; rows: Flag[] }> = [
     name: 'Title card',
     rows: [
       { flag: '--title', text: 'Adds a title card at the end of the film.', values: ['`"Name"`'], def: 'No card' },
-      { flag: '--version', text: 'Adds a version line under the title. Needs `--title`.', values: ['`"v1.0"`'], def: 'None' }
+      { flag: '--version', text: 'Adds a version line under the title. Needs `--title`.', values: ['`"v1.0"`'], def: 'None' },
+      { flag: '--credit', text: 'Adds a small “made with silk reel” line to the last frame.', def: 'Off' }
     ]
   },
   {

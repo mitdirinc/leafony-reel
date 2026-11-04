@@ -92,6 +92,21 @@ describe('drawTraceFrame', () => {
     expect(texts.some((t) => 'Qzx Glasgow'.startsWith(t) && t.length > 0)).toBe(true)
   })
 
+  it('draws the credit only when asked, and only on the held frame', () => {
+    const credit = 'made with silk reel'
+    const late = (t: TraceTimeline) => Math.floor(t.totalFrames * 0.97)
+    const rec = currentRecorder()
+    drawTraceFrame(asCtx(rec), traceTimeline('glasgow.kicad_pcb'), late(traceTimeline('glasgow.kicad_pcb')))
+    expect(callsOf('fillText').some((c) => c.args[0] === credit)).toBe(false)
+    const timeline = traceTimeline('glasgow.kicad_pcb', { credit: true })
+    rec.reset()
+    drawTraceFrame(asCtx(rec), timeline, Math.floor(timeline.totalFrames * 0.3))
+    expect(callsOf('fillText').some((c) => c.args[0] === credit)).toBe(false)
+    rec.reset()
+    drawTraceFrame(asCtx(rec), timeline, late(timeline))
+    expect(callsOf('fillText').some((c) => c.args[0] === credit)).toBe(true)
+  })
+
   it('clears instead of filling on a transparent timeline', () => {
     const timeline = traceTimeline('glasgow.kicad_pcb', { transparent: true })
     const rec = new RecordingCtx()

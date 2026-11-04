@@ -10,7 +10,7 @@ import type { BoardStats, FromWorker, ToWorker } from './studio.worker'
 type Format = 'mp4' | 'gif' | 'webm-alpha' | 'prores-alpha'
 interface State {
   board: string; style: StyleId; aspect: Aspect; palette: PaletteId; accent: string; useAccent: boolean
-  title: string; version: string; tempo: number; seed: number; format: Format
+  title: string; version: string; credit: boolean; tempo: number; seed: number; format: Format
   /** '' lets the film pick */
   hero: string; mask: MaskColor | ''
 }
@@ -58,6 +58,7 @@ export function setupStudio() {
     useAccent: /^#[0-9a-f]{6}$/i.test(q.get('accent') ?? ''),
     title: (q.get('title') ?? '').slice(0, 32),
     version: (q.get('version') ?? '').slice(0, 12),
+    credit: q.get('credit') === '1',
     tempo: Math.min(1.5, Math.max(0.75, Number(q.get('tempo') ?? 1) || 1)),
     seed: Number.isInteger(Number(q.get('seed'))) && q.get('seed') !== null ? Number(q.get('seed')) : 42,
     format: (['mp4', 'gif', 'webm-alpha', 'prores-alpha'] as const).find((f) => f === q.get('format')) ?? 'mp4',
@@ -76,6 +77,7 @@ export function setupStudio() {
     set('title', state.title); set('version', state.version); set('accent', state.accent)
     set('tempo', String(state.tempo)); set('seed', String(state.seed))
     set('hero', state.hero); set('mask', state.mask)
+    const credit = field('credit')[0]; if (credit) credit.checked = state.credit
   }
   const readForm = () => {
     const pick = (name: string) => field(name).find((el) => el.checked)?.value
@@ -85,6 +87,7 @@ export function setupStudio() {
     state.format = (pick('format') as Format | undefined) ?? state.format
     const val = (name: string) => field(name)[0]?.value ?? ''
     state.title = val('title').trim(); state.version = val('version').trim()
+    state.credit = field('credit')[0]?.checked === true
     state.accent = val('accent')
     state.tempo = Number(val('tempo')) || 1
     state.hero = val('hero')
@@ -105,7 +108,8 @@ export function setupStudio() {
       ...(state.useAccent ? { accent: state.accent } : {}),
       ...(state.hero ? { hero: state.hero } : {}),
       ...(style === 'trace' && state.mask ? { mask: state.mask } : {}),
-      ...(state.title ? { title: { name: state.title, ...(state.version ? { version: state.version } : {}) } } : {})
+      ...(state.title ? { title: { name: state.title, ...(state.version ? { version: state.version } : {}) } } : {}),
+      ...(state.credit ? { credit: true } : {})
     }
   }
 
@@ -121,6 +125,7 @@ export function setupStudio() {
     if (state.style === 'trace' && state.mask) parts.push('--mask', state.mask)
     if (state.title) parts.push('--title', quote(state.title))
     if (state.title && state.version) parts.push('--version', quote(state.version))
+    if (state.credit) parts.push('--credit')
     if (state.seed !== 42) parts.push('--seed', String(state.seed))
     if (state.tempo !== 1) parts.push('--tempo', String(state.tempo))
     if (state.format !== 'mp4') parts.push('--format', state.format)
@@ -435,6 +440,7 @@ export function setupStudio() {
     if (state.useAccent) p.set('accent', state.accent)
     if (state.title) p.set('title', state.title)
     if (state.version) p.set('version', state.version)
+    if (state.credit) p.set('credit', '1')
     if (state.seed !== 42) p.set('seed', String(state.seed))
     if (state.tempo !== 1) p.set('tempo', String(state.tempo))
     if (state.format !== 'mp4') p.set('format', state.format)

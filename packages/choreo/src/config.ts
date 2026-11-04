@@ -16,6 +16,7 @@ export interface ResolvedConfig {
   aspect: Aspect | undefined
   palette: Palette
   title: TitleCard | undefined
+  credit: boolean
   transparent: boolean
   knobs: ResolvedKnobs
   seed: number | null
@@ -94,6 +95,10 @@ export function resolveConfig(config: FilmConfig): ResolvedConfig {
       throw new ChoreoConfigError('title.version', version, 'expected 0-24 characters')
     }
     title = config.title
+  }
+
+  if (config.credit !== undefined && typeof config.credit !== 'boolean') {
+    throw new ChoreoConfigError('credit', config.credit, 'expected a boolean')
   }
 
   if (config.transparent !== undefined && typeof config.transparent !== 'boolean') {
@@ -196,6 +201,7 @@ export function resolveConfig(config: FilmConfig): ResolvedConfig {
     aspect,
     palette: resolvePalette(style, paletteIdRaw as PaletteId | undefined, config.accent),
     title,
+    credit: config.credit === true,
     transparent,
     knobs: { texts: texts.value, tempo: tempo.value },
     seed: config.seed,
