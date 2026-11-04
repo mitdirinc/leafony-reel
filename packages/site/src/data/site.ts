@@ -5,7 +5,10 @@ export const site = {
   url: 'https://silkreel.hridya.tech',
   repo,
   line: 'KiCad in. Film out.',
-  description: 'Turn a KiCad board file into a release film: the lit board under a camera, or its parts set as a looping glyph film. Any aspect, any format.',
+  title: 'silk reel: release films from KiCad boards',
+  description: "Give silk reel a KiCad board file and it renders a release film from the board's real copper, parts and silkscreen. MP4, GIF, WebM or ProRes.",
+  author: { '@type': 'Person', '@id': 'https://www.hridya.tech/#person', name: 'Hridya Agrawal', url: 'https://www.hridya.tech' },
+  caseStudy: 'https://www.hridya.tech/projects/silkreel',
   command: 'npm run reel -- board.kicad_pcb',
   setup: `git clone ${repo} && cd silkreel && npm ci`
 }

@@ -3,7 +3,7 @@ import sitemap from '@astrojs/sitemap'
 
 export default defineConfig({
   site: 'https://silkreel.hridya.tech',
-  integrations: [sitemap()],
+  integrations: [sitemap({ lastmod: new Date() })],
   prefetch: { prefetchAll: true, defaultStrategy: 'viewport' },
   build: { inlineStylesheets: 'auto' },
   vite: {
