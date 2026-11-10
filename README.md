@@ -40,11 +40,11 @@ npm run leafony:render -- --stills --out exports/cat-m1-kit.mp4
 
 ## Leafony Docsで動画を見せる
 
-このリポジトリは映像の生成と確認用です。読者には、既存のLeafony Docsのキットページ内に動画を埋め込んで見せる想定です。MP4と表紙をR2などの動画配信先へ配置し、DocsのMDXから標準の動画プレーヤーで参照できます。元CADや生成シーンを配信する必要はありません。
+このリポジトリは映像の生成と確認用です。短いキット動画はMuxへアップロードし、既存のLeafony Docsのキットページ内に埋め込みます。表紙はDocs側で管理し、クリック後にMuxのプレーヤーを読み込みます。元CADや生成シーンを配信する必要はありません。
 
 キットページでは概要の後に「動画で組み立てを見る」を置き、その後に内容物と詳細手順を続けます。自動再生せず、表紙を表示して再生操作を待つ構成です。公開前に実機との整合と映像を確認し、実在する配信URLを設定してください。
 
-R2を本番配信に使う場合は、開発用のr2.devではなく独自ドメインを使います。HTMLはGitHub側、動画と表紙はR2側で別々に更新できます。[R2公式資料](https://developers.cloudflare.com/r2/buckets/public-buckets/)
+制作・配信方針は[SpaceのLeafony動画メモ](https://chatgpt.com/space/page_79f2e995600c81918db80267719cd520)、埋め込みの実装は[DocsのPR #46](https://github.com/leafony/starlight-docs/pull/46)を参照してください。今回のR2コピーは削除済みです。
 
 ## 確認
 
