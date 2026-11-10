@@ -22,6 +22,9 @@
     "packages/*"
   ],
   "scripts": {
+    "leafony:prepare": "npm run prepare:assets --workspace=@leafony/reel",
+    "leafony:dev": "npm run dev --workspace=@leafony/reel",
+    "leafony:render": "node --import tsx packages/leafony/src/render.ts",
     "typecheck": "tsc --noEmit",
     "build": "npm run build --workspaces --if-present",
     "test": "vitest run",
