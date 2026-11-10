@@ -1,0 +1,22 @@
+{
+  "name": "@leafony/reel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare:assets": "node --import tsx src/prepare.ts",
+    "dev": "vite --host 127.0.0.1 --port 3190 --strictPort",
+    "build": "vite build",
+    "render": "node --import tsx src/render.ts"
+  },
+  "dependencies": {
+    "@silk-reel/choreo": "0.1.0",
+    "@silk-reel/ingest": "0.1.0",
+    "@silk-reel/render-api": "0.1.0",
+    "remotion": "4.0.515",
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.187.0"
+  }
+}
