@@ -1,0 +1,191 @@
+[
+  {
+    "id": "AP03B",
+    "repo": "leafony/ap03b-stm32",
+    "revision": "ad90db72c1df99186744741674f798318816d29a",
+    "path": "kicad/ap03b-stm32/ap03b-stm32.kicad_pcb",
+    "blobSha": "8bbc885e3813969e987f1684343d8219c25b791c",
+    "kind": "board",
+    "access": "public"
+  },
+  {
+    "id": "AZ01C",
+    "repo": "leafony/az01c-usb-c",
+    "revision": "7796bf3f207877c9d259c53311c69d81496d7669",
+    "path": "kicad/leafony-az01c.kicad_pcb",
+    "blobSha": "f71cf7757dcfb961b32ad4ff131a071172c0125a",
+    "kind": "board",
+    "access": "public"
+  },
+  {
+    "id": "AV06",
+    "repo": "leafony/av06-1v8-5v5",
+    "revision": "9258758c9a8863d6616d3277d4e42ff3df5f00aa",
+    "path": "kicad/leafony-av06-1v8-5v5/leafony-av06-1v8-5v5.kicad_pcb",
+    "blobSha": "18aa3c56fe4911429c63986ea9b1e2c6e5f25e32",
+    "kind": "board",
+    "access": "public"
+  },
+  {
+    "id": "AV06",
+    "repo": "leafony/av06-1v8-5v5",
+    "revision": "9258758c9a8863d6616d3277d4e42ff3df5f00aa",
+    "path": "kicad/leafony-av06-1v8-5v5/lib/3dmodels/CUS-12TB.step",
+    "blobSha": "4100ea27a5cac38360bb9498aa103382c8402c72",
+    "kind": "step",
+    "access": "public"
+  },
+  {
+    "id": "AV06",
+    "repo": "leafony/av06-1v8-5v5",
+    "revision": "9258758c9a8863d6616d3277d4e42ff3df5f00aa",
+    "path": "kicad/leafony-av06-1v8-5v5/lib/3dmodels/IND_DFE252012PD-1R0MP2_MUR.step",
+    "blobSha": "df90bda70177ab79e16a87e36b874e920a1d690c",
+    "kind": "step",
+    "access": "public"
+  },
+  {
+    "id": "AV06",
+    "repo": "leafony/av06-1v8-5v5",
+    "revision": "9258758c9a8863d6616d3277d4e42ff3df5f00aa",
+    "path": "kicad/leafony-av06-1v8-5v5/lib/3dmodels/MAX40200ANS_T.step",
+    "blobSha": "697ae829fcb0205b664a74255a233952a8e39d37",
+    "kind": "step",
+    "access": "public"
+  },
+  {
+    "id": "AV06",
+    "repo": "leafony/av06-1v8-5v5",
+    "revision": "9258758c9a8863d6616d3277d4e42ff3df5f00aa",
+    "path": "kicad/leafony-av06-1v8-5v5/lib/3dmodels/S2B-PH-SM4-TB.STEP",
+    "blobSha": "f55509397aa7a2dd366ea7fcfbbd357da8517240",
+    "kind": "step",
+    "access": "public"
+  },
+  {
+    "id": "AV06",
+    "repo": "leafony/av06-1v8-5v5",
+    "revision": "9258758c9a8863d6616d3277d4e42ff3df5f00aa",
+    "path": "kicad/leafony-av06-1v8-5v5/lib/3dmodels/TPS631010YBGR.step",
+    "blobSha": "3ee01b6f587c8c05495dc0fa07b4f99e7aa9d8fb",
+    "kind": "step",
+    "access": "public"
+  },
+  {
+    "id": "AI05",
+    "repo": "leafony/ai05-env-sensors",
+    "revision": "a6b318ff16b1cb3802cbc273af1e932f3861de17",
+    "path": "kicad/ai05-env-sensors/ai05-env-sensors.kicad_pcb",
+    "blobSha": "7c0782232a3707a250d8157273261ca050e40e9c",
+    "kind": "board",
+    "access": "public"
+  },
+  {
+    "id": "AC09",
+    "repo": "leafony/ac09-cat-m1-ty",
+    "revision": "8a1f1183c7b8f01e1e88e0a968e2c5245ce89e63",
+    "path": "kicad/leafony_lte_m/leafony_lte_m.kicad_pcb",
+    "blobSha": "f5c2c8b88778692bd2fe46b361037740955ef501",
+    "kind": "board",
+    "access": "authorized"
+  },
+  {
+    "id": "AC09",
+    "repo": "leafony/ac09-cat-m1-ty",
+    "revision": "8a1f1183c7b8f01e1e88e0a968e2c5245ce89e63",
+    "path": "kicad/leafony_lte_m/lib/3dmodels/1042240820.stp",
+    "blobSha": "5ed7cf401cd18d08c5e8cdd43dc7cf4754d0a203",
+    "kind": "step",
+    "access": "authorized"
+  },
+  {
+    "id": "AC09",
+    "repo": "leafony/ac09-cat-m1-ty",
+    "revision": "8a1f1183c7b8f01e1e88e0a968e2c5245ce89e63",
+    "path": "kicad/leafony_lte_m/lib/3dmodels/734120110.stp",
+    "blobSha": "1d0888bd40e122321e31ef1bde98c8ad9be7d2dd",
+    "kind": "step",
+    "access": "authorized"
+  },
+  {
+    "id": "AC09",
+    "repo": "leafony/ac09-cat-m1-ty",
+    "revision": "8a1f1183c7b8f01e1e88e0a968e2c5245ce89e63",
+    "path": "kicad/leafony_lte_m/lib/3dmodels/PCAL6408AHKX_NXP.step",
+    "blobSha": "3387acf30a0f19429c7e7f154e5b12abeb33e457",
+    "kind": "step",
+    "access": "authorized"
+  },
+  {
+    "id": "AC09",
+    "repo": "leafony/ac09-cat-m1-ty",
+    "revision": "8a1f1183c7b8f01e1e88e0a968e2c5245ce89e63",
+    "path": "kicad/leafony_lte_m/lib/3dmodels/STAF-1019-085A.step",
+    "blobSha": "658a0ea8633430d4959907118eae076e5f78426b",
+    "kind": "step",
+    "access": "authorized"
+  },
+  {
+    "id": "AC09",
+    "repo": "leafony/ac09-cat-m1-ty",
+    "revision": "8a1f1183c7b8f01e1e88e0a968e2c5245ce89e63",
+    "path": "kicad/leafony_lte_m/lib/3dmodels/TLV71718PDQNT.stp",
+    "blobSha": "b8970b7ece31fc39c26ead03ceef654b3fabc5f1",
+    "kind": "step",
+    "access": "authorized"
+  },
+  {
+    "id": "AC09",
+    "repo": "leafony/ac09-cat-m1-ty",
+    "revision": "8a1f1183c7b8f01e1e88e0a968e2c5245ce89e63",
+    "path": "kicad/leafony_lte_m/lib/3dmodels/TXB0104RUTR.stp",
+    "blobSha": "f3df1221245e02efa33961ec2e96a4a49337b7ae",
+    "kind": "step",
+    "access": "authorized"
+  },
+  {
+    "id": "AC09",
+    "repo": "leafony/ac09-cat-m1-ty",
+    "revision": "8a1f1183c7b8f01e1e88e0a968e2c5245ce89e63",
+    "path": "kicad/leafony_lte_m/lib/3dmodels/U.FL_Hirose_U.FL-R-SMT-1_Vertical.step",
+    "blobSha": "fcfeb9e5ca216c9597ed1ea86ca39c0077650e19",
+    "kind": "step",
+    "access": "authorized"
+  },
+  {
+    "id": "AC09",
+    "repo": "leafony/ac09-cat-m1-ty",
+    "revision": "8a1f1183c7b8f01e1e88e0a968e2c5245ce89e63",
+    "path": "kicad/leafony_lte_m/lib/3dmodels/WSCLxADAH2Z.step",
+    "blobSha": "f9fa0b71d6b13af897f5d585f4e3e5a4eb1b5bbd",
+    "kind": "step",
+    "access": "authorized"
+  },
+  {
+    "id": "AX04",
+    "repo": "leafony/HW-Design-Files",
+    "revision": "c51d994774e5c2d71b091d8ad8380b22fdd96cf1",
+    "path": "AX04_Spacer/AX04_Spacer_3D.zip",
+    "blobSha": "020931da63eab524564d341c67f37f3905b8b023",
+    "kind": "zip",
+    "access": "public"
+  },
+  {
+    "id": "AZ61",
+    "repo": "leafony/HW-Design-Files",
+    "revision": "c51d994774e5c2d71b091d8ad8380b22fdd96cf1",
+    "path": "AZ61_Connector/AZ61_Connector_3D.zip",
+    "blobSha": "3df5d2288bacd0a8ee025dafe0577892f7d3496d",
+    "kind": "zip",
+    "access": "public"
+  },
+  {
+    "id": "AZ63",
+    "repo": "leafony/HW-Design-Files",
+    "revision": "c51d994774e5c2d71b091d8ad8380b22fdd96cf1",
+    "path": "AZ63_Nut_Plate/AZ63_Nut_Plate_3D.zip",
+    "blobSha": "38f24d785141f32a0e422c682ba56ecb61085143",
+    "kind": "zip",
+    "access": "public"
+  }
+]

@@ -1,0 +1,22 @@
+{
+  "id": "cellular-lpwa-cat-m1",
+  "name": "Cellular LPWA Cat-M1 Kit",
+  "source": "https://docs.leafony.com/products/cellular-lpwa-cat-m1/",
+  "assemblySource": "https://docs.leafony.com/getting-started/cellular-lpwa-cat-m1/",
+  "layers": [
+    {"id":"AV06","name":"AV06 電源","role":"電池から3.3Vを供給","thickness":0.8},
+    {"id":"AC09","name":"AC09 Cat-M1 TY","role":"携帯電話網で通信","thickness":0.85},
+    {"id":"AX04","name":"AX04 Spacer","role":"リーフ間の間隔を確保","thickness":0.8},
+    {"id":"AP03B","name":"AP03B STM32 MCU","role":"センサと通信を制御","thickness":0.8},
+    {"id":"AZ01C","name":"AZ01C USB-C","role":"パソコンと接続","thickness":0.8},
+    {"id":"AI05","name":"AI05 Env Sensors","role":"温湿度・気圧・加速度を計測","thickness":0.8}
+  ],
+  "suppliedSeparately": ["AX02B 29-pin", "1NCE nanoSIM", "PHコネクター付き単3形電池2本用ボックス"],
+  "fastener": {"diameter":2,"length":18,"count":2,"nutPlate":"AZ63"},
+  "mechanical": {
+    "contactGap": 2,
+    "status": "illustrative",
+    "note": "積層順は公式ガイドに準拠。接点間隔2mmと締め付け動作は表示用の仮設定で、実機の圧縮量・干渉・締付トルクを保証しません。"
+  },
+  "duration": 24
+}

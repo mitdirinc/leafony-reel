@@ -20,3 +20,7 @@ docs/
 evidence/
 HANDOFF.md
 progress.md
+
+# Pinned Leafony design sources and generated scene assets are fetched locally.
+packages/leafony/.cache/
+packages/leafony/public/generated/

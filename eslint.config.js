@@ -92,7 +92,10 @@ export default tseslint.config(
       'packages/cli/src/cli.ts',
       'packages/render-api/src/scripts/render-canonical.ts',
       'packages/render-api/src/server.ts',
-      'packages/studio/src/studio-server.ts'
+      'packages/studio/src/studio-server.ts',
+      'packages/leafony/src/download.ts',
+      'packages/leafony/src/prepare.ts',
+      'packages/leafony/src/render.ts'
     ],
     rules: {
       'no-console': 'off'

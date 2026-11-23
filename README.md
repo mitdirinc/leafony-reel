@@ -1,3 +1,66 @@
+# Leafony Kit Motion
+
+Leafonyの単体リーフ紹介と、キットを重ねてネジで固定する流れを動画にするための、[silkreel](https://github.com/hridaya423/silkreel)のフォークです。
+
+最初の対象は[Cellular LPWA Cat-M1 Kit](https://docs.leafony.com/products/cellular-lpwa-cat-m1/)。6段の積層、AZ61コネクタの共通配置、AX04 Spacer、AZ63 Nut Plate、M2×18mmネジの交互締め付けを表示します。
+
+## Leafony版を使う
+
+Node.js 22以降、ffmpeg、ffprobe、unzipが必要です。AC09設計データを取得できるGitHubアカウントで `gh auth login` を済ませてください。
+
+```sh
+npm ci
+npm run leafony:prepare
+npm run leafony:dev
+```
+
+プレビューは http://127.0.0.1:3190/ で開きます。再生・一時停止・場面への移動・分解表示に対応しています。自動再生はしません。
+
+```sh
+# 24秒・1920×1080・30fpsのMP4と表紙を出力（無音）
+npm run leafony:render -- --out exports/cat-m1-kit.mp4
+
+# 全編を書き出す前に、6場面を画像で確認
+npm run leafony:render -- --stills --out exports/cat-m1-kit.mp4
+```
+
+## 構成と共通部品
+
+- `packages/leafony/kits/cellular-lpwa-cat-m1.json`：下から上の積層順、付属品、ネジ、表示時間。
+- `packages/leafony/sources.json`：公式設計ファイルの取得元、固定リビジョン、Git blobチェックサム。
+- `packages/leafony/src/prepare.ts`：KiCadとSTEPから表示データを準備。
+- `packages/leafony/src/mechanics.ts`：16.5mm間隔の取付穴を基準とした位置合わせと、積層・交互締め付けの時間制御。
+- `packages/leafony/src/scene.ts`：画面とMP4で共有する3D描画。
+
+上からの順番は **AI05 → AZ01C → AP03B → AX04 → AC09 → AV06**。同梱のAX02Bは、この組み立てには含めません。[公式組み立て手順](https://docs.leafony.com/getting-started/cellular-lpwa-cat-m1/)を基準にしています。
+
+積層順と基板形状は出典に基づきます。接点間隔2mm、ねじの回転・移動、Nut Plateの高さは映像用の初期設定です。実機の圧縮量・干渉・締付トルクを検証した組立治具やシミュレータではありません。未提供の部品モデルには推定形状を使い、準備時の `manifest.json` に不足を記録します。現物確認後はキット定義と共通部品の配置を更新してください。
+
+取得したCADと生成シーンはローカルの `.cache/` と `public/generated/` に保存し、Gitには含めません。AC09の非公開設計データは、既存のアクセス権で取得します。認証情報を保存したり、CAD・生成シーンを公開フォークへ同梱したりしません。生成データを含むWebビルドの公開は別途判断してください。
+
+## Leafony Docsで動画を見せる
+
+このリポジトリは映像の生成と確認用です。短いキット動画はMuxへアップロードし、既存のLeafony Docsのキットページ内に埋め込みます。表紙はDocs側で管理し、クリック後にMuxのプレーヤーを読み込みます。元CADや生成シーンを配信する必要はありません。
+
+キットページでは概要の後に「動画で組み立てを見る」を置き、その後に内容物と詳細手順を続けます。自動再生せず、表紙を表示して再生操作を待つ構成です。公開前に実機との整合と映像を確認し、実在する配信URLを設定してください。
+
+制作・配信方針は[SpaceのLeafony動画メモ](https://chatgpt.com/space/page_79f2e995600c81918db80267719cd520)、埋め込みの実装は[DocsのPR #46](https://github.com/leafony/starlight-docs/pull/46)を参照してください。今回のR2コピーは削除済みです。
+
+## 確認
+
+```sh
+npm run typecheck
+npx eslint packages/leafony
+npx vitest run packages/leafony/src/mechanics.test.ts
+npm run build --workspace=@leafony/reel
+```
+
+動画は全編と5fpsの一覧で確認します。レビュー記録は、上流の方針に従いローカルの `docs/reviews/` に残します。
+
+上流のApache-2.0ライセンスとクレジットは維持します。以下は上流の説明です。
+
+---
+
 <p align="center">
   <img src="packages/site/public/og.png" alt="silk reel: a circuit board in, a film out" width="100%" />
 </p>
