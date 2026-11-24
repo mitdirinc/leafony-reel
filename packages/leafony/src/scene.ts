@@ -1,4 +1,5 @@
 import * as T from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import type { Footprint, Vec2 } from '@silk-reel/ingest'
 import { assemblyState, closedContours, item, smooth, toBus } from './mechanics'
 import type { KitDefinition, LeafAsset, MeshData, SceneAssets } from './types'
@@ -95,7 +96,49 @@ function surfaceTexture(leaf: LeafAsset, side: 'F' | 'B', bounds: T.Box2): T.Can
   return texture
 }
 
-function pcb(leaf: LeafAsset): T.Group {
+/**
+ * Roughness (green) and metalness (blue) for a board face, so exposed pads read
+ * as plated metal against the solder mask once the scene has reflections.
+ */
+function finishTexture(leaf: LeafAsset, side: 'F' | 'B', bounds: T.Box2): T.CanvasTexture {
+  const canvas = document.createElement('canvas'), scale = 30
+  const size = bounds.getSize(new T.Vector2())
+  canvas.width = Math.ceil(size.x * scale); canvas.height = Math.ceil(size.y * scale)
+  const c = canvas.getContext('2d')
+  if (!c) throw new Error('Canvas2D is not available')
+  c.scale(scale, scale); c.translate(-bounds.min.x, -bounds.min.y)
+  const finish = (roughness: number, metalness: number) => `rgb(0 ${Math.round(roughness * 255)} ${Math.round(metalness * 255)})`
+  c.fillStyle = finish(.55, 0); c.fillRect(bounds.min.x, bounds.min.y, size.x, size.y)
+  c.fillStyle = finish(.28, 1)
+  for (const pad of leaf.board.copper[`${side}.Cu`]?.pads ?? []) {
+    const p = toBus(pad.pos, leaf.frame); c.save(); c.translate(p.x, p.y); c.rotate(-pad.rot * Math.PI / 180)
+    c.beginPath()
+    if (pad.shape === 'circle') c.ellipse(0, 0, pad.size.x / 2, pad.size.y / 2, 0, 0, Math.PI * 2)
+    else c.roundRect(-pad.size.x / 2, -pad.size.y / 2, pad.size.x, pad.size.y,
+      pad.shape === 'oval' ? Math.min(pad.size.x, pad.size.y) / 2 : Math.min(pad.size.x, pad.size.y) * 0.16)
+    c.fill(); c.restore()
+  }
+  return new T.CanvasTexture(canvas)
+}
+
+/** A blurred footprint laid on the floor: the soft look's only ground shadow. */
+function contactShadow(footprint: T.Vector2): T.Mesh {
+  const canvas = document.createElement('canvas'), pixels = 256
+  canvas.width = pixels; canvas.height = pixels
+  const c = canvas.getContext('2d')
+  if (!c) throw new Error('Canvas2D is not available')
+  const span = Math.max(footprint.x, footprint.y) * 2, scale = pixels / span
+  const w = footprint.x * scale, h = footprint.y * scale
+  // The rectangle itself is drawn off-canvas; only its blurred shadow lands in view.
+  c.shadowColor = '#000'; c.shadowBlur = pixels * .16; c.shadowOffsetX = pixels * 2
+  c.fillRect((pixels - w) / 2 - pixels * 2, (pixels - h) / 2, w, h)
+  const mesh = new T.Mesh(new T.PlaneGeometry(span, span),
+    new T.MeshBasicMaterial({ map:new T.CanvasTexture(canvas), transparent:true, depthWrite:false, toneMapped:false }))
+  mesh.rotation.x = -Math.PI / 2
+  return mesh
+}
+
+function pcb(leaf: LeafAsset, soft: boolean): T.Group {
   const group = new T.Group(), shape = shapeOf(leaf)
   const body = new T.ExtrudeGeometry(shape, { depth: leaf.board.stackup.thickness, bevelEnabled: false, curveSegments: 16 })
   const solid = new T.Mesh(body, plastic('#69633a'))
@@ -109,8 +152,9 @@ function pcb(leaf: LeafAsset): T.Group {
       (position.getX(i) - bounds.min.x) / (bounds.max.x - bounds.min.x),
       1 - (-position.getY(i) - bounds.min.y) / (bounds.max.y - bounds.min.y))
     geometry.setAttribute('uv', new T.Float32BufferAttribute(uv, 2))
+    const finish = soft ? finishTexture(leaf, side, bounds) : null
     const face = new T.Mesh(geometry, new T.MeshStandardMaterial({ map:surfaceTexture(leaf, side, bounds),
-      roughness:0.52, metalness:0.12, side:T.DoubleSide }))
+      roughness:finish ? 1 : 0.52, metalness:finish ? 1 : 0.12, roughnessMap:finish, metalnessMap:finish, side:T.DoubleSide }))
     face.rotation.x = -Math.PI / 2
     face.position.y = side === 'F' ? 0.01 : -leaf.board.stackup.thickness - 0.01
     face.receiveShadow = true; group.add(face)
@@ -181,6 +225,19 @@ function screw(length: number): T.Group {
   return group
 }
 
+const FLOOR_Y = -7
+/** Contact shadow strength with the kit assembled; it thins as the leaves lift away. */
+const CONTACT_OPACITY = .34
+
+export interface KitSceneOptions {
+  /**
+   * `studio` (default) is the kit video: an opaque, strongly lit floor.
+   * `soft` is for embedding in a page: a transparent canvas, reflections from a neutral room,
+   * plated pads, and one blurred contact shadow under the kit.
+   */
+  look?: 'studio' | 'soft'
+}
+
 export class KitScene {
   private renderer: T.WebGLRenderer
   private scene = new T.Scene()
@@ -188,30 +245,50 @@ export class KitScene {
   private layers: T.Group[] = []
   private bolts: T.Group[] = []
   private nut = new T.Group()
+  private environment: T.WebGLRenderTarget | null = null
+  private contact: T.Mesh<T.PlaneGeometry, T.MeshBasicMaterial> | null = null
+  private restingTop = 0
   private width = 1
   private height = 1
-  constructor(canvas: HTMLCanvasElement, assets: SceneAssets, private kit: KitDefinition) {
-    this.renderer = new T.WebGLRenderer({ canvas, antialias:true, alpha:false, preserveDrawingBuffer:true })
+  constructor(canvas: HTMLCanvasElement, assets: SceneAssets, private kit: KitDefinition, options: KitSceneOptions = {}) {
+    const soft = options.look === 'soft'
+    this.renderer = new T.WebGLRenderer({ canvas, antialias:true, alpha:soft, preserveDrawingBuffer:true })
     this.renderer.setPixelRatio(1)
     this.renderer.outputColorSpace = T.SRGBColorSpace
-    this.renderer.toneMapping = T.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.15
-    this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = T.PCFShadowMap
-    this.scene.background = new T.Color('#e8eff2')
-    this.scene.add(new T.HemisphereLight('#ffffff','#a2b1ad',2.2))
-    const key = new T.DirectionalLight('#fff9eb',3.2); key.position.set(-30,85,55); key.castShadow = true
+    // Neutral keeps the mask and plating colours true; the video keeps its filmic contrast.
+    this.renderer.toneMapping = soft ? T.NeutralToneMapping : T.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = soft ? .92 : 1.15
+    this.renderer.shadowMap.enabled = true
+    // VSM is the map type that blurs; the video keeps its crisp PCF shadow.
+    this.renderer.shadowMap.type = soft ? T.VSMShadowMap : T.PCFShadowMap
+    if (soft) {
+      // Reflections come from a neutral lit room, so metal and gloss have something to show.
+      const pmrem = new T.PMREMGenerator(this.renderer), room = new RoomEnvironment()
+      this.environment = pmrem.fromScene(room, .04)
+      room.dispose(); pmrem.dispose()
+      this.scene.environment = this.environment.texture; this.scene.environmentIntensity = .5
+    } else this.scene.background = new T.Color('#e8eff2')
+    this.scene.add(new T.HemisphereLight('#ffffff',soft ? '#dfe3df' : '#a2b1ad',soft ? 1.3 : 2.2))
+    // Soft: the key is weak and nearly overhead; it shades the boards against each other, not the floor.
+    const key = new T.DirectionalLight('#fff9eb',soft ? 1.5 : 3.2); key.castShadow = true
+    if (soft) key.position.set(-14,120,26); else key.position.set(-30,85,55)
     key.shadow.mapSize.set(2048,2048); key.shadow.camera.left=-80; key.shadow.camera.right=80
     key.shadow.camera.top=100; key.shadow.camera.bottom=-60; key.shadow.camera.far=250
-    key.shadow.normalBias=.04; key.shadow.bias=-.00015; this.scene.add(key)
-    const fill = new T.DirectionalLight('#d4e5ff',1.3); fill.position.set(45,25,-35); this.scene.add(fill)
-    const floor = new T.Mesh(new T.PlaneGeometry(1000,1000), new T.MeshStandardMaterial({color:'#e8eff2',roughness:1}))
-    floor.rotation.x=-Math.PI/2; floor.position.y=-7; floor.receiveShadow=true; this.scene.add(floor)
+    key.shadow.normalBias=.04; key.shadow.bias=-.00015
+    if (soft) { key.shadow.radius=12; key.shadow.blurSamples=24; key.shadow.bias=-.002 }
+    this.scene.add(key)
+    const fill = new T.DirectionalLight('#d4e5ff',soft ? .5 : 1.3); fill.position.set(45,25,-35); this.scene.add(fill)
+    if (!soft) {
+      const floor = new T.Mesh(new T.PlaneGeometry(1000,1000), new T.MeshStandardMaterial({color:'#e8eff2',roughness:1}))
+      floor.rotation.x=-Math.PI/2; floor.position.y=FLOOR_Y; floor.receiveShadow=true; this.scene.add(floor)
+    }
     this.layers = kit.layers.map(layer => {
       const group = new T.Group()
       if (layer.id === 'AX04') assets.spacer.forEach(mesh => group.add(cadMesh(mesh)))
       else {
         const leaf = assets.leaves[layer.id]
         if (!leaf) throw new Error(`${layer.id}: run npm run leafony:prepare first`)
-        group.add(pcb(leaf))
+        group.add(pcb(leaf,soft))
         for (const fp of leaf.board.footprints) { const object = component(leaf,fp); if (object) group.add(object) }
         assets.connector.forEach(mesh => group.add(cadMesh(mesh)))
       }
@@ -220,6 +297,14 @@ export class KitScene {
     assets.nutPlate.forEach(mesh => this.nut.add(cadMesh(mesh)))
     this.nut.position.y=-2.12; this.scene.add(this.nut)
     this.bolts = [-8.25,8.25].map(x => { const group=screw(kit.fastener.length); group.position.x=x; this.scene.add(group); return group })
+    if (soft) {
+      const footprint = new T.Box3()
+      this.layers.forEach(layer => footprint.expandByObject(layer))
+      const size = footprint.getSize(new T.Vector3()), center = footprint.getCenter(new T.Vector3())
+      this.contact = contactShadow(new T.Vector2(size.x,size.z)) as T.Mesh<T.PlaneGeometry, T.MeshBasicMaterial>
+      this.contact.position.set(center.x,FLOOR_Y,center.z); this.scene.add(this.contact)
+      this.restingTop = item(assemblyState(kit,kit.duration).layers,kit.layers.length-1).y
+    }
   }
   resize(width: number, height: number): void {
     this.width=Math.max(1,Math.round(width)); this.height=Math.max(1,Math.round(height))
@@ -231,6 +316,10 @@ export class KitScene {
     this.bolts.forEach((bolt,i) => {
       const pose=item(state.screws,i); bolt.position.y=pose.y; bolt.rotation.y=pose.angle; bolt.visible=pose.visible
     })
+    if (this.contact) {
+      const top = item(state.layers,state.layers.length-1).y - FLOOR_Y, resting = this.restingTop - FLOOR_Y
+      this.contact.material.opacity = CONTACT_OPACITY * Math.sqrt(resting/top)
+    }
     const bounds = new T.Box3()
     this.layers.forEach(layer => bounds.expandByObject(layer)); bounds.expandByObject(this.nut)
     this.bolts.filter(b => b.visible).forEach(b => bounds.expandByObject(b))
@@ -252,10 +341,12 @@ export class KitScene {
       const mesh=object as T.Mesh
       mesh.geometry.dispose()
       for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-        if (m instanceof T.MeshStandardMaterial) m.map?.dispose()
+        if (m instanceof T.MeshStandardMaterial) { m.map?.dispose(); m.metalnessMap?.dispose() }
+        if (m instanceof T.MeshBasicMaterial) m.map?.dispose()
         m.dispose()
       }
     })
+    this.environment?.dispose()
     this.renderer.dispose()
   }
 }
